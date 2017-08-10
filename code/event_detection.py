@@ -1,36 +1,38 @@
+#!/usr/bin/python
 import numpy as np
 import os
+from os.path import join as opj
+import sys
+import gzip
+from os.path import basename
+from os.path import exists
+from glob import glob
 
+#infile = sys.argv[1]
+#outfile = sys.argv[2]
 
+def preproc(infile, outfile):
+    a= gzip.open(infile,"r")
+    out=gzip.open(outfile,"wb")
 
-path="D:\\BA - Kopie\\saccdata\\savgol\\lab"
-dirs=os.listdir(path)
-for file in dirs:
-    f= open(os.path.join(path, file),"r")
-    name= os.path.basename(f.name)
-    vp=int(name[0:2])
-    #run=int(name[6:7])
-    run=int(name[5:6]) if len(name)<11 else int(name[8:9])
-    out=open("D:\\BA - Kopie\\output saccades\\new\\includefix\\smooth\\"+str(vp)+"run"+str(run)+".txt", "w")
+#def proc(infile, outfile):
+#    out=open(outfile, "w")
 
     newThr=200
 
-
-    file=[]
-    line=f.readline()
-    while line:
-        num=line.split()
-        file.append(num)
-        line=f.readline()
-    f.close()
+    data=[]
+    with gzip.open(infile, "r") as infileobj:
+        for line in infileobj:
+            num=line.split()
+            data.append(num)
 
 #####get threshold function #######
     def getThresh(cut):
         temp=[]
         i=0
-        while i<len(file):
-            if float((file[i])[0])<cut:
-                temp.append(float((file[i])[0]))
+        while i<len(data):
+            if float((data[i])[0])<cut:
+                temp.append(float((data[i])[0]))
             i+=1
 
         avg=np.mean(temp)
@@ -56,8 +58,8 @@ for file in dirs:
 ####get peaks####
     peaks=[]
 
-    for i in range(len(file)-1):
-        if float((file[i])[0])<threshold and float((file[i+1])[0])>threshold:
+    for i in range(len(data)-1):
+        if float((data[i])[0])<threshold and float((data[i+1])[0])>threshold:
             peaks.append(i+1)
 
     p=0
@@ -65,29 +67,29 @@ for file in dirs:
     while p<len(peaks):
         idx=peaks[p]
         pval=[]
-        while float((file[idx])[0])>avg+3*sd and idx!=0:
-            pval.append(float((file[idx])[0]))
+        while float((data[idx])[0])>avg+3*sd and idx!=0:
+            pval.append(float((data[idx])[0]))
             idx-=1
         idx+=1
-        ts=float((file[idx])[2])                     ###saccade onset
-        xs=float((file[idx])[3])
-        ys=float((file[idx])[4])
+        ts=float((data[idx])[2])                     ###saccade onset
+        xs=float((data[idx])[3])
+        ys=float((data[idx])[4])
         fix.append(-idx)
 
         temp=[]
         for i in range (1,41):
-            temp.append(float((file[idx-i])[0]))
+            temp.append(float((data[idx-i])[0]))
         offAvg=np.mean(temp)
         offSd=np.std(temp)
 
         idx=peaks[p]+1
-        while idx<len(file) and float((file[idx])[0])>(0.7*(avg+3*sd)+0.3*(offAvg+3+offSd)):
-            pval.append(float((file[idx])[0]))
+        while idx<len(data) and float((data[idx])[0])>(0.7*(avg+3*sd)+0.3*(offAvg+3+offSd)):
+            pval.append(float((data[idx])[0]))
             idx+=1
         idx-=1
-        te=float((file[idx])[2])                     ###saccade offset
-        xe=float((file[idx])[3])
-        ye=float((file[idx])[4])
+        te=float((data[idx])[2])                     ###saccade offset
+        xe=float((data[idx])[3])
+        ye=float((data[idx])[4])
         fix.append(idx)
 
         if len(pval)>9 and len(pval)+10>(te-ts+1):      ####minimum duration 9 ms and no blinks allowed
@@ -106,14 +108,14 @@ for file in dirs:
         offset=False
         pval=[]
         for d in range(40):
-            if idx+d>=len(file)-1: break
-            pval.append(float((file[idx+d])[0]))
-            if float((file[idx+d])[0])<avg+3*sd and float((file[idx+d-1])[0])>avg+3*sd:
+            if idx+d>=len(data)-1: break
+            pval.append(float((data[idx+d])[0]))
+            if float((data[idx+d])[0])<avg+3*sd and float((data[idx+d-1])[0])>avg+3*sd:
                 below=True
-            if below and float((file[idx+d])[0])-float((file[idx+d+1])[0])<=0:
-                ts=float((file[idx+d])[2])
-                xs=float((file[idx+d])[3])
-                ys=float((file[idx+d])[4])
+            if below and float((data[idx+d])[0])-float((data[idx+d+1])[0])<=0:
+                ts=float((data[idx+d])[2])
+                xs=float((data[idx+d])[3])
+                ys=float((data[idx+d])[4])
                 offset=True
         idx=idx+d
         if offset and len(pval)+11>ts-te+1:      #not more than 10 ms of signal loss in glissades
@@ -140,17 +142,17 @@ for file in dirs:
 
     while j<len(fix)-1:
         if fix[j]>0 and abs(fix[j+1])-fix[j]>40:          #onset of fixation
-              ts=float((file[fix[j]])[2])
-              xs=float((file[fix[j]])[3])
-              ys=float((file[fix[j]])[4])
+              ts=float((data[fix[j]])[2])
+              xs=float((data[fix[j]])[3])
+              ys=float((data[fix[j]])[4])
 
-              te=float((file[abs(fix[j+1])])[2])
-              xe=float((file[abs(fix[j+1])])[3])
-              ye=float((file[abs(fix[j+1])])[4])
+              te=float((data[abs(fix[j+1])])[2])
+              xe=float((data[abs(fix[j+1])])[3])
+              ye=float((data[abs(fix[j+1])])[4])
 
               pval=[]
               for i in range(fix[j],abs(fix[j+1])):
-                  pval.append(float((file[i])[0]))
+                  pval.append(float((data[i])[0]))
 
               #pv=max(pval)
               amp=(((xs-xe)**2+(ys-ye)**2)**0.5)*0.01
@@ -166,4 +168,28 @@ for file in dirs:
 
     out.close()
     print ("done")
+    
+#if __name__ == '__main__':
+#    proc(infile, outfile)
+    
+    
+if __name__ == '__main__':
+    subjs = [basename(i) for i in glob('sub-*')]
+    for sub in subjs:
+#        if not exists(sub):
+#            os.makedirs(sub)
+        for run in range(1, 9):
+            print('Doing {} run {}'.format(sub, run))
+            run = str(run)
+            infile = '{sub}/eyegaze_run-{run}_preprocessed.tsv.gz'.format(
+                sub=sub,
+                run=run)
+#            if not exists(infile):
+#                infile = 'inputs/raw_eyegaze/{sub}/beh/{sub}_task-movie_run-{run}_recording-eyegaze_physio.tsv.gz'.format(
+#                sub=sub,
+#                run=run)
+
+            preproc(
+                infile,
+                '{sub}/eyegaze_run-{run}_saccades.txt.gz'.format(sub=sub, run=run))
 

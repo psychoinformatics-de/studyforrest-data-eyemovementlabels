@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
 import numpy as np
-from scipy.signal import savgol_filter
-from glob import glob
+from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing data
+from glob import glob                  # The glob.glob returns the list of files with their full path
 import gzip
 import os
-from os.path import basename
-from os.path import exists
+from os.path import basename           # returns the tail of the path
+from os.path import exists             # logical for if a certain file exists
 
 def preproc(infile, outfile):
     a= gzip.open(infile,"r")

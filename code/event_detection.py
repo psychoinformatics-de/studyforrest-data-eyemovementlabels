@@ -18,28 +18,28 @@ def preproc(infile, outfile):
 #def proc(infile, outfile):
 #    out=open(outfile, "w")
 
-    newThr=200
+    newThr=200                              # What is this "threshold"?
 
     data=[]
     with gzip.open(infile, "r") as infileobj:
         for line in infileobj:
-            num=line.split()
-            data.append(num)
+            num=line.split()                # Strips away white space
+            data.append(num)                # just added all the lines of data (now split) into data []
 
 #####get threshold function #######
-    def getThresh(cut):
+    def getThresh(cut):                     # def refers to defining your own function; cut is input arg
         temp=[]
         i=0
         while i<len(data):
-            if float((data[i])[0])<cut:
+            if float((data[i])[0])<cut:     #the first [0], which is VELOCITY is checked; if less than 'cut' it is kept. (Thus the cut is an upper boundary for velocity?)
                 temp.append(float((data[i])[0]))
-            i+=1
+            i+=1                            # The value of i is added by 1, thus making a loop going through len(data), ie all the blocks in the array
 
         avg=np.mean(temp)
         sd=np.std(temp)
-        return avg+6*sd, avg, sd
+        return avg+6*sd, avg, sd            # outputs of function; average+6*sd denotes a RANGE in any normal distribution
 
-###### threshold function #########
+###### threshold function #########      NYSTROM and HOLMQVIST (2010) ALGORITHM IS USED to find a suitable threshold  
 
 
     avg=0
@@ -47,9 +47,9 @@ def preproc(infile, outfile):
     dif=2
 
     while dif>1:
-        oldThr=newThr
-        newThr, avg, sd=getThresh(oldThr)
-        dif=abs(oldThr-newThr)
+        oldThr=newThr                      #Threshold in 100-300 degree/sec. 200 here.
+        newThr, avg, sd=getThresh(oldThr)  #Average and std is calculated and Thr is renewed
+        dif=abs(oldThr-newThr)           #return absolute value, keep doing the loop until PTn-PTn-1 is smaller than 1 degree
 
     threshold=newThr
     print("after thr selection", threshold)

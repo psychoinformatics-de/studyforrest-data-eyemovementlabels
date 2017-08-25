@@ -25,6 +25,10 @@ def preproc(infile, outfile):
         for line in infileobj:
             num=line.split()                # Strips away white space
             data.append(num)                # just added all the lines of data (now split) into data []
+            
+            
+            
+    print ("Data length", len(data))        
 
 #####get threshold function #######
     def getThresh(cut):                     # def refers to defining your own function; cut is input arg

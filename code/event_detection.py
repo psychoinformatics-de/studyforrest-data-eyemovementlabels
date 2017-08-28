@@ -59,12 +59,12 @@ def preproc(infile, outfile):
     print("after thr selection", threshold)
 
 
-####get peaks####
+####get peaks#### Saccade by definition, is the first velocity that goes below the saccade threshold
     peaks=[]
 
     for i in range(len(data)-1):
-        if float((data[i])[0])<threshold and float((data[i+1])[0])>threshold:
-            peaks.append(i+1)
+        if float((data[i])[0])<threshold and float((data[i+1])[0])>threshold:    #for velocities less than threshold and next more than threshold; for FIRST to below threshold, shouldnt this be i-1?
+            peaks.append(i+1)                                                    # (contin.) the line number is saved
 
     p=0
     fix=[]

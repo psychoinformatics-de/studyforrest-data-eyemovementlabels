@@ -59,21 +59,21 @@ def preproc(infile, outfile):
     print("after thr selection", threshold)
 
 
-####get peaks#### Saccade by definition, is the first velocity that goes below the saccade threshold
+####get peaks#### Saccade by definition, is the first velocity that goes below the saccade threshold (NOT VELOCITY threshold)
     peaks=[]
 
     for i in range(len(data)-1):
-        if float((data[i])[0])<threshold and float((data[i-1])[0])>threshold:    #for velocities less than threshold and next more than threshold; for FIRST to below threshold, shouldnt this be i-1?
-            peaks.append(i+1)                                                    # (contin.) the line number is saved
+        if float((data[i])[0])<threshold and float((data[i+1])[0])>threshold:    #for velocities less than threshold and next more than threshold; for FIRST to below threshold, shouldnt this be i-1?
+            peaks.append(i+1)                                                    # (contin.) the line number is saved. You'll get = [3,4,23,65....n]
 
     p=0
     fix=[]
     while p<len(peaks):
-        idx=peaks[p]
+        idx=peaks[p]                                                           #elment p of array peaks (which is a single line of numbers)
         pval=[]
-        while float((data[idx])[0])>avg+3*sd and idx!=0:
-            pval.append(float((data[idx])[0]))
-            idx-=1
+        while float((data[idx])[0])>avg+3*sd and idx!=0:# reading the line of the saccade peak; while velocity is more than the SACCADE THRESHOLD and it does NOT equal 0
+            pval.append(float((data[idx])[0])) #take the value of velocity in these cases and append ;pval=[v1,v2....]
+            idx-=1#idx -1; so now we're working backwards in the original data[] going one line 'back' from the saccade
         idx+=1
         ts=float((data[idx])[2])                     ###saccade onset
         xs=float((data[idx])[3])

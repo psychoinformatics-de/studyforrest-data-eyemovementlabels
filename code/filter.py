@@ -62,12 +62,12 @@ def preproc(infile, outfile):
     vel=[float(0)]
     i=0
     while i<len(xlist)-1:
-            d=((xlist[i]-xlist[i+1])**2+(ylist[i]-ylist[i+1])**2)**0.5
-            d=d*0.01*1000
+            d=((xlist[i]-xlist[i+1])**2+(ylist[i]-ylist[i+1])**2)**0.5 #See pg 5 of NYSTROM
+            d=d*0.01*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels
             if d<1000:
                 vel.append(d)
             else:
-                vel.append(vel[len(vel)-1])
+                vel.append(vel[len(vel)-1]) #saves previous value of vel as vel>1000
     
             i+=1
     

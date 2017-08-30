@@ -64,7 +64,7 @@ def preproc(infile, outfile):
     i=0
     while i<len(xlist)-1:
             d=((xlist[i]-xlist[i+1])**2+(ylist[i]-ylist[i+1])**2)**0.5 #See pg 5 of NYSTROM
-            d=d*0.0259930434591*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels. FOR MRI 0.0259930434591
+            d=d*0.01*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels. FOR MRI 0.0259930434591
             if d<1000:
                 vel.append(d)
             else:
@@ -82,11 +82,11 @@ def preproc(infile, outfile):
     data=np.array([vel, acc, time, xlist, ylist])
     data=data.T
     np.savetxt(out, data, fmt=['%.1f', '%.1f', '%d', '%.1f', '%.1f'], delimiter='\t')
-    print ("done")
+    
     out.close()
 
 if __name__ == '__main__':
-    subjs = [basename(i) for i in glob('inputs/raw_eyegaze/sub-{01..22}*')]
+    subjs = [basename(i) for i in glob('inputs/raw_eyegaze/sub-*')]
     for sub in subjs:
         if not exists(sub):
             os.makedirs(sub)
@@ -96,7 +96,10 @@ if __name__ == '__main__':
             infile = 'inputs/raw_eyegaze/{sub}/ses-movie/func/{sub}_ses-movie_task-movie_run-{run}_recording-eyegaze_physio.tsv.gz'.format(
                 sub=sub,
                 run=run)
-            
+            if not exists(infile):
+                print ('skipping')
+                continue
+                
 
             preproc(
                 infile,

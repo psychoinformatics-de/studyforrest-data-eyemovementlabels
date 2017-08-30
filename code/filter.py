@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: iso-8859-15 -*-
 
 import numpy as np
 from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing data
@@ -63,7 +64,7 @@ def preproc(infile, outfile):
     i=0
     while i<len(xlist)-1:
             d=((xlist[i]-xlist[i+1])**2+(ylist[i]-ylist[i+1])**2)**0.5 #See pg 5 of NYSTROM
-            d=d*0.01*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels
+            d=d*0.01*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels. FOR MRI 0.0259930434591
             if d<1000:
                 vel.append(d)
             else:

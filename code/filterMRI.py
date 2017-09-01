@@ -64,7 +64,7 @@ def preproc(infile, outfile):
     i=0
     while i<len(xlist)-1:
             d=((xlist[i]-xlist[i+1])**2+(ylist[i]-ylist[i+1])**2)**0.5 #See pg 5 of NYSTROM
-            d=d*0.01*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels. FOR MRI 0.0259930434591
+            d=d*0.0181699054976*1000 #1000 is the sampling rate !(checked=true for both)! and 0.01 is the conversion factor for degrees to pixels. FOR MRI 0.0181699054976
             if d<1000:
                 vel.append(d)
             else:
@@ -86,7 +86,7 @@ def preproc(infile, outfile):
     out.close()
 
 if __name__ == '__main__':
-    subjs = [basename(i) for i in glob('inputs/raw_eyegaze/sub-*')]
+    subjs = [basename(i) for i in glob('inputs/raw_eyegaze/sub-01')]
     for sub in subjs:
         if not exists(sub):
             os.makedirs(sub)

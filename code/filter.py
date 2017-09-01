@@ -93,13 +93,12 @@ if __name__ == '__main__':
         for run in range(1, 9):
             print('Doing {} run {}'.format(sub, run))
             run = str(run)
-            infile = 'inputs/raw_eyegaze/{sub}/ses-movie/func/{sub}_ses-movie_task-movie_run-{run}_recording-eyegaze_physio.tsv.gz'.format(
+            infile = 'inputs/raw_eyegaze/{sub}/beh/{sub}_task-movie_run-{run}_recording-eyegaze_physio.tsv.gz'.format(
                 sub=sub,
                 run=run)
             if not exists(infile):
-                infile = 'inputs/raw_eyegaze/{sub}/beh/{sub}_task-movie_run-{run}_recording-eyegaze_physio.tsv.gz'.format(
-                sub=sub,
-                run=run)
+                print ('skipping')
+                continue 
 
             preproc(
                 infile,

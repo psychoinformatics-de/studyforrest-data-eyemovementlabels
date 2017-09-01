@@ -64,7 +64,7 @@ def preproc(infile, outfile):
 
     for i in range(len(data)-1):
         if float((data[i])[0])<threshold and float((data[i+1])[0])>threshold:    #for velocities less than threshold and next more than threshold; for FIRST to below threshold, shouldnt this be i-1?
-            peaks.append(i+1)                                                    # (contin.) the line number is saved. You'll get = [3,4,23,65....n]
+            peaks.append(i+1)                                                    # (contin.) the line number (end point of saccade) is saved. You'll get = [3,4,23,65....n]
 
     p=0
     fix=[]

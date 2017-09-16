@@ -197,3 +197,49 @@ if __name__ == '__main__':
                 infile,
                 '{sub}/eyegaze_run-{run}_saccades.txt.gz'.format(sub=sub, run=run))
 
+
+
+
+#Selection criterion for IVT threshold
+
+#@inproceedings{Olsen:2012:IPV:2168556.2168625,
+#author = {Olsen, Anneli and Matos, Ricardo},
+#title = {Identifying Parameter Values for an I-VT Fixation Filter Suitable for Handling Data Sampled with Various Sampling Frequencies},
+# booktitle = {Proceedings of the Symposium on Eye Tracking Research and Applications},
+#series = {ETRA '12},
+#year = {2012},
+#isbn = {978-1-4503-1221-9},
+#location = {Santa Barbara, California},
+#pages = {317--320},
+#numpages = {4},
+#url = {http://doi.acm.org/10.1145/2168556.2168625},
+#doi = {10.1145/2168556.2168625},
+#acmid = {2168625},
+#publisher = {ACM},
+#address = {New York, NY, USA},
+#keywords = {algorithm, classification, eye movements, scoring},
+#} 
+
+#Human-Computer Interaction: Psychonomic Aspects
+#edited by Gerrit C. van der Veer, Gijsbertus Mulder
+#pg 58-59
+
+#Eye Tracking: A comprehensive guide to methods and measures: Rötting (2001)
+#By Kenneth Holmqvist, Marcus Nyström, Richard Andersson, Richard Dewhurst, Halszka Jarodzka, Joost van de Weijer
+
+#A good reveiw along with a great chunk of the content found in this code:
+#@Article{Nystr├Âm2010,
+#author="Nystr{\"o}m, Marcus
+#and Holmqvist, Kenneth",
+#title="An adaptive algorithm for fixation, saccade, and glissade detection in eyetracking data",
+#journal="Behavior Research Methods",
+#year="2010",
+#month="Feb",
+#day="01",
+#volume="42",
+#number="1",
+#pages="188--204",
+#abstract="Event detection is used to classify recorded gaze points into periods of fixation, saccade, smooth pursuit, blink, and noise. Although there is an overall consensus that current algorithms for event detection have serious flaws and that a de facto standard for event detection does not exist, surprisingly little work has been done to remedy this problem. We suggest a new velocity-based algorithm that takes several of the previously known limitations into account. Most important, the new algorithm identifies so-called glissades, a wobbling movement at the end of many saccades, as a separate class of eye movements. Part of the solution involves designing an adaptive velocity threshold that makes the event detection less sensitive to variations in noise level and the algorithm settings-free for the user. We demonstrate the performance of the new algorithm on eye movements recorded during reading and scene perception and compare it with two of the most commonly used algorithms today. Results show that, unlike the currently used algorithms, fixations, saccades, and glissades are robustly identified by the new algorithm. Using this algorithm, we found that glissades occur in about half of the saccades, during both reading and scene perception, and that they have an average duration close to 24 msec. Due to the high prevalence and long durations of glissades, we argue that researchers must actively choose whether to assign the glissades to saccades or fixations; the choice affects dependent variables such as fixation and saccade duration significantly. Current algorithms do not offer this choice, and their assignments of each glissade are largely arbitrary.",
+#issn="1554-3528",
+#doi="10.3758/BRM.42.1.188",
+#url="https://doi.org/10.3758/BRM.42.1.188"

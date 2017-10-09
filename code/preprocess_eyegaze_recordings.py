@@ -70,8 +70,12 @@ def preproc(infile, outfile, px2deg):
     data=np.array([
         filtered_velocities,
         accelerations,
+        # TODO add time np.arange(len(filtered_velocities))
         data['x'],
         data['y']])
+
+    data = data[~np.isnan(data['accel'])]
+
     # TODO think about just saving it in binary form
     np.savetxt(
         outfile,

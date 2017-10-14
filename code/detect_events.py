@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: iso-8859-15 -*-
 import numpy as np
 from scipy import ndimage
 import os
@@ -12,7 +13,7 @@ from glob import glob
 #infile = sys.argv[1]
 #outfile = sys.argv[2]
 
-def detect(infile, outfile, fixation_threshold):
+def detect(infile, outfile, fixation_threshold, px2deg):
     data = np.recfromcsv(
         infile,
         delimiter='\t',
@@ -92,7 +93,7 @@ def detect(infile, outfile, fixation_threshold):
             sacc_data = sacc_data[~np.isnan(sacc_data['vel'])]
             pv = sacc_data['vel'].max()
             amp = (((sacc_data[0]['x'] - sacc_data[-1]['x']) ** 2 + \
-                    (sacc_data[0]['y'] - sacc_data[-1]['y']) ** 2) ** 0.5) * 0.01 # << WRONG! factor
+                    (sacc_data[0]['y'] - sacc_data[-1]['y']) ** 2) ** 0.5) * px2deg # << WRONG! factor
             avVel = sacc_data['vel'].mean()
             saccades.append((
                 sacc_start,
@@ -106,6 +107,37 @@ def detect(infile, outfile, fixation_threshold):
                 avVel))
 
 ######## end of saccade detection = begin of glissade detection ########
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #        idx+=1
 #        below=False
 #        offset=False
@@ -123,7 +155,7 @@ def detect(infile, outfile, fixation_threshold):
 #        idx=idx+d
 #        if offset and len(pval)+11>ts-te+1:      #not more than 10 ms of signal loss in glissades
 #            pv=max(pval)
-#            amp=(((xs-xe)**2+(ys-ye)**2)**0.5)*0.01 # << WRONG! factor
+#            amp=(((xs-xe)**2+(ys-ye)**2)**0.5) * px2deg # << WRONG! factor
 #            amp= "%.2f" % amp
 #            avVel=np.mean(pval)
 #            s= " "
@@ -158,7 +190,7 @@ def detect(infile, outfile, fixation_threshold):
 #                  pval.append(float((data[i])[0]))
 #
 #              #pv=max(pval)
-#              amp=(((xs-xe)**2+(ys-ye)**2)**0.5)*0.01 # << WRONG! factor
+#              amp=(((xs-xe)**2+(ys-ye)**2)**0.5)* px2deg # << WRONG! factor
 #
 #              avVel=np.mean(pval)
 #              if avVel<fixation_threshold and amp<2 and len(pval)+11>(te-ts)+1:
@@ -180,9 +212,10 @@ def detect(infile, outfile, fixation_threshold):
 
 if __name__ == '__main__':
     fixation_threshold = float(sys.argv[1])
-    infpath = sys.argv[2]
-    outfpath = sys.argv[3]
-    detect(infpath, outfpath, fixation_threshold)
+    px2deg = float(sys.argv[2])
+    infpath = sys.argv[3]
+    outfpath = sys.argv[4]
+    detect(infpath, outfpath, fixation_threshold, px2deg)
 
 
 
@@ -211,8 +244,8 @@ if __name__ == '__main__':
 #edited by Gerrit C. van der Veer, Gijsbertus Mulder
 #pg 58-59
 
-#Eye Tracking: A comprehensive guide to methods and measures: Rötting (2001)
-#By Kenneth Holmqvist, Marcus Nyström, Richard Andersson, Richard Dewhurst, Halszka Jarodzka, Joost van de Weijer
+#Eye Tracking: A comprehensive guide to methods and measures: Rotting (2001)
+#By Kenneth Holmqvist, Marcus Nystrom, Richard Andersson, Richard Dewhurst, Halszka Jarodzka, Joost van de Weijer
 
 #A good reveiw along with a great chunk of the content found in this code:
 #@Article{Nystr├Âm2010,

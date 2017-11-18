@@ -157,7 +157,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
         if f > 0 and abs(fix[j + 1]) - f > 40:          #onset of fixation
             fixdata = data[f:abs(fix[j + 1])]
             if not len(fixdata):
-                print("SHIT")
+                print("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
 
@@ -174,12 +174,14 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     pv,
                     avVel))
 
+    
     # TODO think about just saving it in binary form
-    with open(outfile, 'w') as f:
-        for e in events:
-            f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+    f = open (outfile, "w")
+    for e in events:
+		f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
     print ("done")
-
+		
+    
 
 if __name__ == '__main__':
     fixation_threshold = float(sys.argv[1])

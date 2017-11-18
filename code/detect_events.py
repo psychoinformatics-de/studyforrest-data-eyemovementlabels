@@ -176,7 +176,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 
     
     # TODO think about just saving it in binary form
-    f = open (outfile, "w")
+    f = gzip.open (outfile, "w")
     for e in events:
 		f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
     print ("done")

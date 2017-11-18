@@ -13,6 +13,15 @@ from glob import glob
 #infile = sys.argv[1]
 #outfile = sys.argv[2]
 
+def get_signal_props(data, px2deg):
+    data = data[~np.isnan(data['vel'])]
+    pv = data['vel'].max()
+    amp = (((data[0]['x'] - data[-1]['x']) ** 2 + \
+            (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * px2deg
+    avVel = data['vel'].mean()
+    return pv, amp, avVel
+ 
+
 def detect(infile, outfile, fixation_threshold, px2deg):
     data = np.recfromcsv(
         infile,
@@ -50,7 +59,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
         np.logical_and(
             data['vel'][:-1] < threshold,
             data['vel'][1:] > threshold))[0]
-    # original code had [0] at index 1
+    # XXX original code had [0] at index 1
     peaks += 1
 
     above_thr_clusters, nclusters = ndimage.label(data['vel'] > soft_threshold)
@@ -61,14 +70,14 @@ def detect(infile, outfile, fixation_threshold, px2deg):
     above_thr_clusters[np.isnan(data['vel'])] = 1
 
     fix=[]
-    saccades = []
+    events = []
     for i, pos in enumerate(peaks):
         sacc_start = pos
         while sacc_start > 0 and above_thr_clusters[sacc_start] > 0:
             sacc_start -= 1
 
         # TODO: make sane
-        fix.append(-(sacc_start - 1))  # this is chinese for saying "I am not a fixation"
+        fix.append(-(sacc_start - 1))  # this is chinese for saying "I am not a fixation anymore"
 
         off_period_vel = data['vel'][sacc_start - 41:sacc_start]
         # exclude NaN
@@ -84,18 +93,16 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                 (data['vel'][sacc_end] > off_threshold or \
                  np.isnan(data['vel'][sacc_end])):
             sacc_end += 1
+        # mark start of a fixation
         fix.append(sacc_end)
 
         # minimum duration 9 ms and no blinks allowed
         if sacc_end - sacc_start > 9 and\
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
-            sacc_data = sacc_data[~np.isnan(sacc_data['vel'])]
-            pv = sacc_data['vel'].max()
-            amp = (((sacc_data[0]['x'] - sacc_data[-1]['x']) ** 2 + \
-                    (sacc_data[0]['y'] - sacc_data[-1]['y']) ** 2) ** 0.5) * px2deg # << WRONG! factor
-            avVel = sacc_data['vel'].mean()
-            saccades.append((
+            pv, amp, avVel = get_signal_props(sacc_data, px2deg)
+            events.append((
+                "SACCADE",
                 sacc_start,
                 sacc_end,
                 sacc_data[0]['x'],
@@ -108,105 +115,69 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 
 ######## end of saccade detection = begin of glissade detection ########
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#        idx+=1
+        idx = sacc_end + 1
 #        below=False
 #        offset=False
-#        pval=[]
-#        for d in range(40):
-#            if idx+d>=len(data)-1: break
-#            pval.append(float((data[idx+d])[0]))
-#            if float((data[idx+d])[0])<avg+3*sd and float((data[idx+d-1])[0])>avg+3*sd:
-#                below=True
-#            if below and float((data[idx+d])[0])-float((data[idx+d+1])[0])<=0:
-#                ts=float((data[idx+d])[2])
-#                xs=float((data[idx+d])[3])
-#                ys=float((data[idx+d])[4])
-#                offset=True
-#        idx=idx+d
-#        if offset and len(pval)+11>ts-te+1:      #not more than 10 ms of signal loss in glissades
-#            pv=max(pval)
-#            amp=(((xs-xe)**2+(ys-ye)**2)**0.5) * px2deg # << WRONG! factor
-#            amp= "%.2f" % amp
-#            avVel=np.mean(pval)
-#            s= " "
-#            seq=("GLISS", str(te), str(ts), str(xe), str(ye), str(xs), str(ys), amp, str(pv), str(avVel), '\n')
-#            out.write(s.join(seq))
-#            fix.pop()
-#            fix.append(idx)
-#
-######### end of glissade detection #######
-#
-#        if idx>peaks[p]:
-#            while p<len(peaks) and idx>=peaks[p]:
-#                p+=1
-#        else:
-#            p+=1
+        # pval=[]
+        sacc_data
+       
+        gldata = data[sacc_end:sacc_end + 40]
+        # going from the end of the window to find the last match
+        for i in range(0, len(gldata) - 2):
+            # velocity after saccade end goes below the soft threshold
+            # and immediately afterwards stay or increases the velocity again
+            if gldata[(-1 * i) - 2]['vel'] < soft_threshold and \
+                    gldata[(-1 * i) - 1]['vel'] > soft_threshold and \
+                    gldata[(-1 * i) -3]['vel'] >= gldata[(-1 * i) -2]['vel']:
+                gliss_data = gldata[:-i]
+                gliss_end = sacc_end + len(gldata) - i
+
+                if not len(gliss_data) or np.sum(np.isnan(gliss_data['vel'])) > 10:
+                    # not more than 10 ms of signal loss in glissades
+                    break
+                pv, amp, avVel = get_signal_props(gliss_data, px2deg)
+                events.append((
+                    "GLISSADE",
+                    sacc_end + 1,
+                    gliss_end,
+                    gldata[0]['x'],
+                    gldata[0]['y'],
+                    gldata[-i]['x'],
+                    gldata[-1]['y'],
+                    amp,
+                    pv,
+                    avVel))
+                fix.pop()
+                fix.append(gliss_end)
+                break
+
 ######### fixation detection after everything else is identified ########
-#
-#    j=0
-#
-#    while j<len(fix)-1:
-#        if fix[j]>0 and abs(fix[j+1])-fix[j]>40:          #onset of fixation
-#              ts=float((data[fix[j]])[2])
-#              xs=float((data[fix[j]])[3])
-#              ys=float((data[fix[j]])[4])
-#
-#              te=float((data[abs(fix[j+1])])[2])
-#              xe=float((data[abs(fix[j+1])])[3])
-#              ye=float((data[abs(fix[j+1])])[4])
-#
-#              pval=[]
-#              for i in range(fix[j],abs(fix[j+1])):
-#                  pval.append(float((data[i])[0]))
-#
-#              #pv=max(pval)
-#              amp=(((xs-xe)**2+(ys-ye)**2)**0.5)* px2deg # << WRONG! factor
-#
-#              avVel=np.mean(pval)
-#              if avVel<fixation_threshold and amp<2 and len(pval)+11>(te-ts)+1:
-#                  amp= "%.2f" % amp
-#                  s= " "
-#                  seq=("FIX", str(ts), str(te), str(xs), str(ys), str(xe), str(ye), amp, str(avVel), '\n')
-#                  out.write(s.join(seq))
-#        j+=1
-#
-#
+
+    for j, f in enumerate(fix[:-1]):
+        if f > 0 and abs(fix[j + 1]) - f > 40:          #onset of fixation
+            fixdata = data[f:abs(fix[j + 1])]
+            if not len(fixdata):
+                print("SHIT")
+                continue
+            pv, amp, avVel = get_signal_props(fixdata, px2deg)
+
+            if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
+                events.append((
+                    "FIX",
+                    f,
+                    fix[j + 1],
+                    data[f]['x'],
+                    data[f]['y'],
+                    data[fix[j + 1]]['x'],
+                    data[fix[j + 1]]['y'],
+                    amp,
+                    pv,
+                    avVel))
+
     # TODO think about just saving it in binary form
-    np.savetxt(
-        outfile,
-        saccades,
-        fmt=['%i', '%i', '%f', '%f', '%f', '%f', '%f', '%f', '%f'],
-        delimiter='\t')
+    with open(outfile, 'w') as f:
+        for e in events:
+            f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
     print ("done")
 
 

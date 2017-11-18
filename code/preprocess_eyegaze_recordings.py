@@ -74,8 +74,6 @@ def preproc(infile, outfile, px2deg):
         data['x'],
         data['y']])
 
-    data = data[~np.isnan(data['accel'])]
-
     # TODO think about just saving it in binary form
     np.savetxt(
         outfile,

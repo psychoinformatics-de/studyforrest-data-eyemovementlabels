@@ -119,7 +119,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 #        below=False
 #        offset=False
         # pval=[]
-        sacc_data
+        #sacc_data
        
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match
@@ -156,7 +156,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
     for j, f in enumerate(fix[:-1]):
         if f > 0 and abs(fix[j + 1]) - f > 40:          #onset of fixation
             fixdata = data[f:abs(fix[j + 1])]
-            if not len(fixdata):
+            if not len(fixdata) or np.isnan(fixdata[0][0]):
                 print("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)

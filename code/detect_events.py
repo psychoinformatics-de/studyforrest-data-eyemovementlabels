@@ -101,6 +101,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
             pv, amp, avVel = get_signal_props(sacc_data, px2deg)
+            sacc_duration = sacc_end - sacc_start
             events.append((
                 "SACCADE",
                 sacc_start,
@@ -111,7 +112,8 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                 sacc_data[1]['y'],
                 amp,
                 pv,
-                avVel))
+                avVel,
+                sacc_duration))
 
 ######## end of saccade detection = begin of glissade detection ########
 
@@ -136,6 +138,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     # not more than 10 ms of signal loss in glissades
                     break
                 pv, amp, avVel = get_signal_props(gliss_data, px2deg)
+                gl_duration = gliss_end - (sacc_end + 1)
                 events.append((
                     "GLISSADE",
                     sacc_end + 1,
@@ -146,7 +149,8 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     gldata[-1]['y'],
                     amp,
                     pv,
-                    avVel))
+                    avVel,
+                    gl_duration))
                 fix.pop()
                 fix.append(gliss_end)
                 break
@@ -160,6 +164,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                 print("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
+            fix_duration = fix[j+1] - f
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
@@ -172,13 +177,14 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     data[fix[j + 1]]['y'],
                     amp,
                     pv,
-                    avVel))
+                    avVel,
+                    fix_duration))
 
     
     # TODO think about just saving it in binary form
     f = gzip.open (outfile, "w")
     for e in events:
-		f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+		f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
     print ("done")
 		
     

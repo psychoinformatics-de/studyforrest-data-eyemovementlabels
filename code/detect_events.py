@@ -164,7 +164,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                 print("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
-            fix_duration = fix[j+1] - f
+            fix_duration = abs(fix[j+1]) - f
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((

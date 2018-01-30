@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/python
 #Assigning all the pieces of data per subject into a dictionary with the name of the subject/run as the dictionary key. Inside the dictionary they are saved as dataframes in pandas ready for analysis.
+
 
 import glob
 import pandas as pd
@@ -7,6 +9,7 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 import numpy as np
 from numpy.polynomial import Polynomial
+from scipy import stats
 
 
 list = glob.glob("*sub*")
@@ -54,7 +57,7 @@ plt.xlim(10, 100)
 plt.ylim(0, 0.07)
 saccadegraph.set(xlabel='Saccade Duration in ms')
 plt.title('Saccade durations over all subjects')
-plt.show()
+plt.draw()
 
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
@@ -71,7 +74,7 @@ velampgraph.set(xlabel='Amplitude', ylabel= 'Peak Velocity')
 # Inserting a fit for the scatter plot, degree = 5
 p = Polynomial.fit(a2saccadesonly.amplitude,a2saccadesonly.peak_vel,5)
 plt.plot(*p.linspace())
-plt.show()
+plt.draw()
 
 ### Figure A3 All saccade amplitudes
 
@@ -80,7 +83,7 @@ saccadeampgraph = sns.distplot(saccadesonly.amplitude,kde=False,norm_hist=True)
 saccadeampgraph.set(xlabel='Saccade Amplitude in deg/s')
 plt.xlim(0, 16)
 plt.title('Saccade amplitudes over all subjects')
-plt.show()
+plt.draw()
 
 ### Figure A4 All saccade peak velocities
 
@@ -89,7 +92,7 @@ saccadepvgraph = sns.distplot(saccadesonly.peak_vel,kde=False,norm_hist=True)
 saccadepvgraph.set(xlabel='Saccade peak velocity in deg/s')
 plt.xlim(0, 800)
 plt.title('Saccade peak velocities over all subjects')
-plt.show()
+plt.draw()
 
 ### Figure A5 All saccade peak_vel * duration (done for Subject 24, run 4)
 
@@ -100,19 +103,20 @@ productgraph.set(ylabel='Product of peak velocity and duration', xlabel = 'Ampli
 plt.xlim(0, 20)
 plt.ylim(0, 30000)
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
-plt.show()
+plt.draw()
 
 ## Sorting out Data to yield the data for tables
+
 ## Table 5.1
 
 # Input run_number (segment) will yield a dataframe with all the data in that segment (only!) across all subjects
-def makelist(run_number):
+def makelist(run_number,dictionary):
 	
 	dataframe = pd.DataFrame()
 	
-	for i in dictofsamples.keys():
+	for i in dictionary.keys():
 		if ("run-"+str(run_number)) in i:
-			dataframe = dataframe.append(dictofsamples[i])
+			dataframe = dataframe.append(dictionary[i])
 			
 			
 	return dataframe
@@ -130,17 +134,116 @@ def findvalues (segment):
 	df = pd.DataFrame ({'#' : ['{0}'.format(segment)],'Duration' : ["{0:.2f} ± {1:.2f}".format(dur_mean,dur_std)], 'Amplitude' : ["{0:.2f} ± {1:.2f}".format(amp_mean,amp_std)], 'Peak Velocity' : ["{0:.2f} ± {1:.2f}".format(peak_velmean,peak_velstd)]})
 	
 	return df
+	
+def saccadecount(run_number):
+	"""
+	Returns saccade count average and std in stated run across all subjects (as string)
+	"""
+	
+	list = []
+	
+	for i in dictofsamples.keys():
+		if ("run-"+str(run_number)) in i:
+			saccades = dictofsamples[i].type == "SACCADE"
+			saccadecount = np.sum(saccades)
+			list.append(saccadecount)
+			
+	array = np.array(list)
+	mean  = array.mean() 
+	std   = array.std()
+				
+	return ("{0:.2f} ± {1:.2f}".format(mean, std))
+	
+def makecountlist(run_number,dictionary):
+	"""
+	Looks into preproc files to find nans and then determines sec per minute lost and percent of total lost
+	"""
+	nancount = 0.0
+	linecount = 0.0
+	
+	for i in dictionary.keys():
+		if ("run-"+str(run_number)) in i:
+			linecount += dictionary[i]['Velocity'].size
+			nancount += np.sum(np.isnan(dictionary[i].Velocity))
+			
+	secpermin_loss = (nancount*0.001)/(linecount*(0.001/60))
+	percentlost   = (nancount/linecount) * 100
+			
+			
+	return secpermin_loss, percentlost
 
 	
 # Make a dictionary with all the subject data, assorted by the segment
 
 segmentlist = {}
 for run in range (1,9):
-	segmentlist["segment{0}".format(run)]= makelist(run)
+	segmentlist["segment{0}".format(run)]= makelist(run,dictofsamples)
 	
-# Run through all segments, finding out values that are needed
+# Run through all segments, finding out values that are needed TO DO: FIND A WAY TO PUT THESE IN A PRINTABLE TABLE FORMAT
 
 data = pd.DataFrame()
 
 for run in range (1,9):
 	data = data.append(findvalues(run))
+
+# Determining means and std of all the runs and making it into a single column
+
+counts = []
+
+for run in range (1,9):
+	counts.append(saccadecount(run))
+	
+allsaccadecounts = pd.DataFrame ({'No of saccades' : counts})
+
+# Time to put together the two components of Table 5.1
+
+# Change indexes to match one another
+
+data.index= range(1,9)
+allsaccadecounts.index = range (1,9)
+
+finaltable5_1 = pd.concat([data, allsaccadecounts], axis=1)
+print ("Table 5.1")
+print finaltable5_1
+
+
+## Table 5.2 
+
+# Nan lines will be counted as the ones 'removed'. For viewing the majority of the nan members
+# we will use preproc files and make all the data available via a dictionary
+
+dictofsamples_preproc = {}
+
+for subject in list:
+
+	allFiles = glob.glob(subject+"/eyegaze_run*preprocessed.tsv.gz") 
+	frame = pd.DataFrame()
+	
+	for run in allFiles:
+		df = pd.read_csv(run,index_col=None, header=None,delim_whitespace=True)
+		df.columns = ["Velocity","Acceleration","x","y"]
+		dictofsamples_preproc["{0}".format(run)]= df
+
+
+# Making two lists, one for sec per min loss and second total percent of loss. Didnt append like
+# before because of the lack of memory to manage a billion (!) line array 
+
+secperminlist=[]
+totallostlist=[]
+ 
+for run in range (1,9):
+	makecountlist(run_number,dictofsamples_)
+
+
+
+
+
+
+
+
+
+# Show plots 
+plt.show()
+	
+
+

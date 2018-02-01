@@ -105,11 +105,12 @@ plt.ylim(0, 30000)
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
 plt.draw()
 
-## Sorting out Data to yield the data for tables
+## Sorting out Data to yield the data for tables TODO: save as separate script
 
 ## Table 5.1
 
 # Input run_number (segment) will yield a dataframe with all the data in that segment (only!) across all subjects
+
 def makelist(run_number,dictionary):
 	
 	dataframe = pd.DataFrame()
@@ -171,6 +172,46 @@ def makecountlist(run_number,dictionary):
 			
 			
 	return secpermin_loss, percentlost
+	
+def findamppeak (segment):
+	"""
+	For the given segment (input a simple integer) slope and r value of the regression line will be given 
+	
+	"""
+	
+	peakvel = segmentlist['segment'+str(segment)]['peak_vel']
+	amplitude = segmentlist['segment'+str(segment)]['amplitude']
+	slope, intercept, r_value, p_value, std_err = stats.linregress(amplitude,peakvel)
+		
+	return slope, r_value
+
+def findvaluesG (segment):
+	"""
+	For the given segment (input a simple integer) a dataframe will be returned with means and std (as strings) to be printed on a table
+	
+	"""
+	
+	gliccades = segmentlist['segment'+str(segment)].type == "GLISSADE"
+	gliccadesonly = segmentlist['segment'+str(segment)][gliccades]
+	dur_mean,amp_mean =  gliccadesonly.duration.mean(), gliccadesonly.amplitude.mean()
+	df = pd.DataFrame ({'#' : ['{0}'.format(segment)],'Duration' : ["{0:.2f}".format(dur_mean)], 'Amplitude' : ["{0:.2f}".format(amp_mean)]})
+	
+	return df
+
+def findvaluesF (segment):
+	"""
+	For the given segment (input a simple integer) a dataframe will be returned with means and std (as strings) to be printed on a table
+	
+	"""
+	
+	fixs = segmentlist['segment'+str(segment)].type == "FIX"
+	fixsonly = segmentlist['segment'+str(segment)][fixs]
+	dur_mean,velmean =  fixsonly.duration.mean(), fixsonly.avg_velocity.mean()
+	# Find the average number of fixes by dividing the number of FIX only by the total subjects (=30)
+	fix_no = (fixsonly.shape[0])/30 
+	df = pd.DataFrame ({'#' : ['{0}'.format(segment)],'Duration' : ["{0:.2f}".format(dur_mean)], 'Fix Mean' : ["{0}".format(fix_no)], 'Average Velocity' : ["{0:.2f}".format(velmean)]})
+	
+	return df
 
 	
 # Make a dictionary with all the subject data, assorted by the segment
@@ -232,13 +273,65 @@ secperminlist=[]
 totallostlist=[]
  
 for run in range (1,9):
-	makecountlist(run_number,dictofsamples_)
+	
+	secpermin, totallost = makecountlist(run,dictofsamples_preproc)
+	secperminlist.append(secpermin)
+	totallostlist.append(totallost)
+	
+#TODO: make into dataframe (see line 134) TODO: AVERAGE SLOPE INSTEAD OF REGRESSION LINE SLOPE
+
+slopelist = []
+rvaluelist = []
+
+for run in range (1,9):
+	slope, rval = findamppeak (run)
+	slopelist.append(slope)
+	rvaluelist.append(rval)
+	
+# Now to make table 5.2 as a dataframe
+segs = range(1,9) 
+
+Table5_2 = pd.DataFrame ()
+	
+for i in range(0,8):
+	
+	new_data = pd.DataFrame ({'#' : ['{0}'.format(segs[i])],'Lost Signal' : ["{0:.1f}".format(secperminlist[i])], 'r sqrd' : ["{0:.3f}".format(rvaluelist[i])], 'Samples Removed (%)' : ["{0:.2f}".format(totallostlist[i])],'Slope' : ['{0:.2f}'.format(slopelist[i])]})
+	Table5_2 = Table5_2.append(new_data)
 
 
 
+Table5_2 = Table5_2 [['#', 'Lost Signal','r sqrd', 'Samples Removed (%)', 'Slope']]
+Table5_2.index= range(1,9)
+print ("  ")
+print ("Table 5.2")
+print Table5_2
 
+## Table 5.3 - Gliccade and Fixation data
 
+Table5_3G = pd.DataFrame ()
+Table5_3F = pd.DataFrame ()
 
+for run in range (1,9):
+	
+	new = findvaluesG (run)
+	Table5_3G = Table5_3G.append(new)
+	
+	new = findvaluesF (run)
+	Table5_3F = Table5_3F.append(new)
+
+#Getting nutty about specific layouts
+Table5_3G = Table5_3G [['#','Duration','Amplitude']]
+Table5_3G.index= range(1,9)
+Table5_3F.index= range(1,9)
+
+print ("  ")
+print ("Table 5.3 - Gliccades")
+print Table5_3G
+
+print ("  ")
+
+print ("Table 5.3 - Fixations")
+print Table5_3F
 
 
 

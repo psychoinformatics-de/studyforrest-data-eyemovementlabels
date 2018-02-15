@@ -52,7 +52,7 @@ saccadesonly = allsubsrun[saccades]
 
 # Plotting
 plt.figure()
-saccadegraph = sns.distplot(saccadesonly.duration,kde=False,norm_hist=True)
+saccadegraph = sns.distplot(saccadesonly.duration,kde=False,norm_hist=True,bins=100)
 plt.xlim(10, 100)
 plt.ylim(0, 0.07)
 saccadegraph.set(xlabel='Saccade Duration in ms')
@@ -79,7 +79,7 @@ plt.draw()
 ### Figure A3 All saccade amplitudes
 
 plt.figure()
-saccadeampgraph = sns.distplot(saccadesonly.amplitude,kde=False,norm_hist=True)
+saccadeampgraph = sns.distplot(saccadesonly.amplitude,kde=False,norm_hist=True,bins=150)
 saccadeampgraph.set(xlabel='Saccade Amplitude in deg/s')
 plt.xlim(0, 16)
 plt.title('Saccade amplitudes over all subjects')

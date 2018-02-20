@@ -12,7 +12,13 @@ from numpy.polynomial import Polynomial
 from scipy import stats
 
 
-list = glob.glob("*sub*")
+fulllist = glob.glob("*sub*")
+fulllist.sort()
+
+#TODO: Assign inputs to determin this, or simply input at start of script input('Show results for? 1-both 2-Beh 3-MRI') followed by downstream changes
+list = fulllist     #for both 
+#list = fulllist[15:] #for beh
+#list = fulllist[0:15] # for MRI
 
 dictofsamples = {}
 
@@ -62,14 +68,14 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-24/events_run-4.tsv.gz']
+subject24_4 = dictofsamples['sub-24/events_run-4.tsv.gz'] # currently manually replacing with random subject in MRI
 a2saccades = subject24_4.type == "SACCADE"
 
 a2saccadesonly = subject24_4[a2saccades] 
 
 # Plotting
 velampgraph = sns.regplot(a2saccadesonly.amplitude,a2saccadesonly.peak_vel,fit_reg = False,scatter_kws={"s": 1})
-plt.title('Relationship between peak velocity and amplitude')
+plt.title('Relationship between peak velocity and amplitude (subject 24)')
 velampgraph.set(xlabel='Amplitude', ylabel= 'Peak Velocity')
 # Inserting a fit for the scatter plot, degree = 5
 p = Polynomial.fit(a2saccadesonly.amplitude,a2saccadesonly.peak_vel,5)
@@ -338,5 +344,10 @@ print Table5_3F
 # Show plots 
 plt.show()
 	
+# manually save tables
+#finaltable5_1.to_csv('5.1_MRI')
+#Table5_2
+#Table5_3G
+#Table5_3F
 
 

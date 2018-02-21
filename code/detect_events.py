@@ -52,7 +52,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
     print("after thr selection", threshold)
 
 
-####get peaks#### Saccade by definition, is the first velocity that goes below the saccade threshold (NOT VELOCITY threshold)
+####get peaks#### Saccade by definition, is the first velocity that goes above the saccade threshold (NOT VELOCITY threshold)
     peaks=[]
 
     peaks = np.where(
@@ -60,6 +60,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
             data['vel'][:-1] < threshold,
             data['vel'][1:] > threshold))[0]
     # XXX original code had [0] at index 1
+    # XXX really?! why 1
     peaks += 1
 
     above_thr_clusters, nclusters = ndimage.label(data['vel'] > soft_threshold)
@@ -67,6 +68,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
         print('Got no above threshold values, baby. Going home...')
         return
     # reinclude any timepoint that has missing data, and treat it as above threshold
+    # XXX could this possibly introduce fake saccades? MIH think not, but isnt sure
     above_thr_clusters[np.isnan(data['vel'])] = 1
 
     fix=[]
@@ -86,7 +88,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
         # data to compute a velocity stdev from
         off_threshold = (0.7 * soft_threshold) + \
                         (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
-                        if len(off_period_vel) > 4 else soft_threshold
+                        if len(off_period_vel) > 40 else soft_threshold
 
         sacc_end = pos
         while sacc_end < len(data) - 1 > 0 and \

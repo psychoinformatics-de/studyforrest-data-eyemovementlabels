@@ -73,6 +73,9 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 
     fix=[]
     events = []
+    
+    print (peaks)
+   
     for i, pos in enumerate(peaks):
         sacc_start = pos
         while sacc_start > 0 and above_thr_clusters[sacc_start] > 0:
@@ -99,7 +102,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
         fix.append(sacc_end)
 
         # minimum duration 9 ms and no blinks allowed
-        if sacc_end - sacc_start > 9 and\
+        if sacc_end - sacc_start > 19 and\
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
             pv, amp, avVel = get_signal_props(sacc_data, px2deg)

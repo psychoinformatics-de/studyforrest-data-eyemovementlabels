@@ -44,8 +44,8 @@ def preproc(infile, outfile, px2deg):
 
     # TODO filtering with NaNs in place kicks out additional datapoints, maybe
     # do no or less dilation of the mask above
-    data['x'] = savgol_filter(data['x'], 9, 1)
-    data['y'] = savgol_filter(data['y'], 9, 1)
+    data['x'] = savgol_filter(data['x'], 19, 1)
+    data['y'] = savgol_filter(data['y'], 19, 1)
 
     #velocity calculation, exclude velocities over 1000
 

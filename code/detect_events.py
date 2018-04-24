@@ -20,7 +20,7 @@ def get_signal_props(data, px2deg):
             (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * px2deg
     avVel = data['vel'].mean()
     return pv, amp, avVel
- 
+
 
 def detect(infile, outfile, fixation_threshold, px2deg):
     data = np.recfromcsv(
@@ -73,9 +73,9 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 
     fix=[]
     events = []
-    
+
     print (peaks)
-   
+
     for i, pos in enumerate(peaks):
         sacc_start = pos
         while sacc_start > 0 and above_thr_clusters[sacc_start] > 0:
@@ -127,7 +127,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 #        offset=False
         # pval=[]
         #sacc_data
-       
+
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match
         for i in range(0, len(gldata) - 2):
@@ -163,13 +163,16 @@ def detect(infile, outfile, fixation_threshold, px2deg):
 ######### fixation detection after everything else is identified ########
 
     for j, f in enumerate(fix[:-1]):
-        if f > 0 and abs(fix[j + 1]) - f > 40:          #onset of fixation
-            fixdata = data[f:abs(fix[j + 1])]
+        fix_start = f
+        # end times are coded negative
+        fix_end = abs(fix[j + 1])
+        if f > 0 and fix_end - f > 40:          #onset of fixation
+            fixdata = data[f:fix_end]
             if not len(fixdata) or np.isnan(fixdata[0][0]):
                 print("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
-            fix_duration = abs(fix[j+1]) - f
+            fix_duration = fix_end - f
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
@@ -178,21 +181,20 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     fix[j + 1],
                     data[f]['x'],
                     data[f]['y'],
-                    data[fix[j + 1]]['x'],
-                    data[fix[j + 1]]['y'],
+                    data[fix_end]['x'],
+                    data[fix_end]['y'],
                     amp,
                     pv,
                     avVel,
                     fix_duration))
 
-    
+
     # TODO think about just saving it in binary form
     f = gzip.open (outfile, "w")
     for e in events:
-		f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+        f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
     print ("done")
-		
-    
+
 
 if __name__ == '__main__':
     fixation_threshold = float(sys.argv[1])

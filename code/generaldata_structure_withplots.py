@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from numpy.polynomial import Polynomial
 from scipy import stats
+import matplotlib.ticker as ticker
 
 
 fulllist = glob.glob("*sub*")
@@ -68,7 +69,7 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-24/events_run-4.tsv.gz'] # currently manually replacing with random subject in MRI
+subject24_4 = dictofsamples['sub-09/events_run-4.tsv.gz'] # currently manually replacing with random subject (9) in MRI
 a2saccades = subject24_4.type == "SACCADE"
 
 a2saccadesonly = subject24_4[a2saccades] 
@@ -94,9 +95,11 @@ plt.draw()
 ### Figure A4 All saccade peak velocities
 
 plt.figure()
-saccadepvgraph = sns.distplot(saccadesonly.peak_vel,kde=False,norm_hist=True)
+saccadepvgraph = sns.distplot(saccadesonly.peak_vel,kde=False,norm_hist=True, bins  = 100)
 saccadepvgraph.set(xlabel='Saccade peak velocity in deg/s')
 plt.xlim(0, 800)
+saccadepvgraph.xaxis.set_major_locator(ticker.MultipleLocator(50))
+saccadepvgraph.xaxis.set_major_formatter(ticker.ScalarFormatter())
 plt.title('Saccade peak velocities over all subjects')
 plt.draw()
 

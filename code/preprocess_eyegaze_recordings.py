@@ -18,6 +18,13 @@ sampling_rate = 1000.0  # in Hertz
 
 
 def preproc(infile, outfile, px2deg):
+    # TODO parameter
+    # max_signal_loss_without_something
+    # blank_duration
+    # savgol_window_length
+    # savgol_polyord
+    # savgol_iterations
+
     outdir = dirname(outfile)
     outdir = curdir if not outdir else outdir
     if not exists(outdir):
@@ -56,15 +63,18 @@ def preproc(infile, outfile, px2deg):
     # convert from px/msec to deg/s
     velocities *= px2deg * sampling_rate
 
+    # replace "too fast" velocities with previous velocity
     accelerations = [float(0)]
     filtered_velocities = [float(0)]
     for vel in velocities:
+        # TODO make threshold a parameter
         if vel > 1000:  # deg/s
             # ignore very fast velocities
             vel = filtered_velocities[-1]
         # acceleration is change of velocities over the last msec
         accelerations.append((vel - filtered_velocities[-1]) * sampling_rate)
         filtered_velocities.append(vel)
+    # TODO report how often that happens
 
     #save data to file
     data=np.array([

@@ -59,44 +59,33 @@ def get_adaptive_saccade_velocity_threshold(data, start=300.0):
     return cur_thresh, (avg + 3 * sd)
 
 
-def find_saccades(vels, soft_threshold, threshold):
+def find_saccades(vels, threshold):
     """Find time periods with saccades
 
     Parameters
     ----------
     vels : array
       Velocities.
-    soft_threshold : float
-      Velocity threshold to determine time periods that might contain
-      a saccade.
     threshold : float
       Velocity threshold to identify the start of a saccade.
 
     Returns
     -------
-    locs, clusters
+    locs
       `loc` is a list of indices of the `vels` array where the saccade
       velocity threshold has been exceeded and the previous sample was still
       below the threshold.
     """
 
-    # TODO this is expensive and apparently useless, a simple threshold would do
-    above_thr_clusters, nclusters = ndimage.label(vels > soft_threshold)
-    if nclusters:
-        # reinclude any timepoint that has missing data, and treat it as above
-        # threshold
-        # XXX could this possibly introduce fake saccades? MIH think
-        # not, but isnt sure
-        above_thr_clusters[np.isnan(vels)] = 1
-        # saccade location is the first velocity that goes above
-        # the saccade threshold (NOT VELOCITY threshold)
-        locs = np.where(
-            np.logical_and(
-                vels[:-1] < threshold,
-                vels[1:] > threshold))[0]
-    else:
+    # saccade location is the first velocity that goes above
+    # the saccade threshold (NOT VELOCITY threshold)
+    locs = np.where(
+        np.logical_and(
+            vels[:-1] < threshold,
+            vels[1:] > threshold))[0]
+    if not locs:
         lgr.warn('Got no above saccade threshold velocity values')
-    return locs, above_thr_clusters
+    return locs
 
 
 def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
@@ -107,14 +96,15 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
     peaks = []
     fix=[]
 
-    peaks, above_thr_clusters = find_saccades(
+    peaks = find_saccades(
         data['vel'],
-        soft_threshold,
         threshold)
 
     for i, pos in enumerate(peaks):
         sacc_start = pos
-        while sacc_start > 0 and above_thr_clusters[sacc_start] > 0:
+        while sacc_start > 0 \
+                and (data['vel'][sacc_start] > soft_threshold \
+                     or np.isnan(data['vel'][sacc_start])):
             sacc_start -= 1
 
         # TODO: make sane

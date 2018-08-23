@@ -96,23 +96,25 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
     peaks = []
     fix=[]
 
+    velocities = data['vel']
+
     peaks = find_saccades(
-        data['vel'],
+        velocities,
         threshold)
 
     for i, pos in enumerate(peaks):
         sacc_start = pos
         while sacc_start > 0 \
-                and (data['vel'][sacc_start] > soft_threshold):
+                and (velocities[sacc_start] > soft_threshold):
             # we used to do this, but it could mean detecting very long
             # saccades that consist of (mostly) missing data
-            #         or np.isnan(data['vel'][sacc_start])):
+            #         or np.isnan(velocities[sacc_start])):
             sacc_start -= 1
 
         # TODO: make sane
         fix.append(-(sacc_start - 1))  # this is chinese for saying "I am not a fixation anymore"
 
-        off_period_vel = data['vel'][sacc_start - 41:sacc_start]
+        off_period_vel = velocities[sacc_start - 41:sacc_start]
         # exclude NaN
         off_period_vel = off_period_vel[~np.isnan(off_period_vel)]
         # go with adaptive threshold, but only if the 40ms prior to the saccade have some
@@ -126,8 +128,8 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         # threshold was exceeded
         sacc_end = pos + 1
         while sacc_end < len(data) - 1 > 0 and \
-                (data['vel'][sacc_end] > off_threshold or \
-                 np.isnan(data['vel'][sacc_end])):
+                (velocities[sacc_end] > off_threshold or \
+                 np.isnan(velocities[sacc_end])):
             sacc_end += 1
         # mark start of a fixation
         fix.append(sacc_end)

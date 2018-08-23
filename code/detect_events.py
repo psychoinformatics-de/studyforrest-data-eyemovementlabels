@@ -93,16 +93,16 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
     threshold, soft_threshold = get_adaptive_saccade_velocity_threshold(data)
 
     events = []
-    peaks = []
+    saccade_locs = []
     fix=[]
 
     velocities = data['vel']
 
-    peaks = find_saccades(
+    saccade_locs = find_saccades(
         velocities,
         threshold)
 
-    for i, pos in enumerate(peaks):
+    for i, pos in enumerate(saccade_locs):
         sacc_start = pos
         while sacc_start > 0 \
                 and (velocities[sacc_start] > soft_threshold):

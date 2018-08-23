@@ -83,7 +83,7 @@ def find_saccades(vels, threshold):
         np.logical_and(
             vels[:-1] < threshold,
             vels[1:] > threshold))[0]
-    if not locs:
+    if not len(locs):
         lgr.warn('Got no above saccade threshold velocity values')
     return locs
 

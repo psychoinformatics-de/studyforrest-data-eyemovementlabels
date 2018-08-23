@@ -89,16 +89,16 @@ def find_saccades(vels, threshold):
 
 
 def get_saccade_end_velocity_threshold(vels, start_idx, width, soft_threshold):
-        off_period_vel = vels[max(0, start_idx - width - 1):start_idx]
-        # exclude NaN
-        off_period_vel = off_period_vel[~np.isnan(off_period_vel)]
-        # go with adaptive threshold, but only if the window prior to the saccade
-        # have some data to compute a velocity stdev from
-        off_threshold = \
-            (0.7 * soft_threshold) + \
-            (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
-            if len(off_period_vel) > 40 else soft_threshold
-        return off_threshold
+    off_period_vel = vels[max(0, start_idx - width - 1):start_idx]
+    # exclude NaN
+    off_period_vel = off_period_vel[~np.isnan(off_period_vel)]
+    # go with adaptive threshold, but only if the window prior to the
+    # saccade have some data to compute a velocity stdev from
+    off_threshold = \
+        (0.7 * soft_threshold) + \
+        (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
+        if len(off_period_vel) > 40 else soft_threshold
+    return off_threshold
 
 
 def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):

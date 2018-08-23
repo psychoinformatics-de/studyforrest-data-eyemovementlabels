@@ -11,12 +11,13 @@ common_args = dict(
 
 
 def test_no_saccade():
-    samp = np.random.randn(1000)
+    samp = np.random.randn(1001)
     data = ut.expand_samp(samp, y=0.0)
     p = pp.preproc(data, savgol_length=0.0, dilate_nan=0, **common_args)
     # the entire segment is labeled as a fixation
     events = detect(p, 50.0, **common_args)
     assert len(events) == 1
+    assert events[0]['duration'] == 1.0
 
 
 def test_one_saccade():

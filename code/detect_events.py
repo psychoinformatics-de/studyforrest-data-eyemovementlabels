@@ -40,32 +40,24 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
 
     threshold=newThr
     soft_threshold = avg + 3 * sd
-    print("after thr selection", threshold)
 
-
-####get peaks#### Saccade by definition, is the first velocity that goes above the saccade threshold (NOT VELOCITY threshold)
-    peaks=[]
-
-    peaks = np.where(
-        np.logical_and(
-            data['vel'][:-1] < threshold,
-            data['vel'][1:] > threshold))[0]
-    # XXX original code had [0] at index 1
-    # XXX really?! why 1
-    peaks += 1
+    events = []
+    peaks = []
 
     above_thr_clusters, nclusters = ndimage.label(data['vel'] > soft_threshold)
-    if not nclusters:
-        print('Got no above threshold values, baby. Going home...')
-        return
-    # reinclude any timepoint that has missing data, and treat it as above threshold
-    # XXX could this possibly introduce fake saccades? MIH think not, but isnt sure
-    above_thr_clusters[np.isnan(data['vel'])] = 1
-
-    fix=[]
-    events = []
-
-    print (peaks)
+    if nclusters:
+        # reinclude any timepoint that has missing data, and treat it as above threshold
+        # XXX could this possibly introduce fake saccades? MIH think not, but isnt sure
+        above_thr_clusters[np.isnan(data['vel'])] = 1
+        fix=[]
+        # Saccade by definition, is the first velocity that goes above
+        # the saccade threshold (NOT VELOCITY threshold)
+        peaks = np.where(
+            np.logical_and(
+                data['vel'][:-1] < threshold,
+                data['vel'][1:] > threshold))[0]
+    else:
+        lgr.warn('Got no above saccade threshold velocity values')
 
     for i, pos in enumerate(peaks):
         sacc_start = pos
@@ -174,7 +166,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 break
 
 ######### fixation detection after everything else is identified ########
-
     if not fix:
         # we got nothing whatsoever, the whole thing is a fixation
         fix = [0 , -(len(data) - 1)]
@@ -189,7 +180,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 lgr.error("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
-            lgr.warn('%f, %f, %f', pv, amp, avVel)
             fix_duration = fix_end - f
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
@@ -206,7 +196,12 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                     avVel,
                     fix_duration / sampling_rate))
 
-    return events
+    field_names = ['label', 'start_time', 'end_time', 'start_x', 'start_y',
+                   'end_x', 'end_y', 'dist', 'peak_vel', 'avg_vel', 'duration']
+    return np.core.records.fromrecords(
+        events,
+        names=field_names,
+    ) if events else None
 
 
 if __name__ == '__main__':

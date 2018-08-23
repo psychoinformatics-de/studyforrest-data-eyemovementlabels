@@ -135,14 +135,15 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         fix.append(sacc_end)
 
         # minimum duration 9 ms and no blinks allowed (!) If we increase this then saccades higher than 9ms will be considered as fixations too --- we can now get the "short" saccades
-        
-        if sacc_end - sacc_start >= 21 and\
+
+        if sacc_end - sacc_start >= 9 and\
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
             pv, amp, avVel = get_signal_props(sacc_data, px2deg)
             sacc_duration = sacc_end - sacc_start
             events.append((
                 "SACCADE",
+                # TODO should yield times not idx
                 sacc_start,
                 sacc_end,
                 sacc_data[0]['x'],
@@ -153,35 +154,8 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 pv,
                 avVel,
                 sacc_duration))
-        # The rest of the shorter saccades will be assigned as "FIX"'s as well. 
-        # Note: they may become indistinguisble from our events that meet the formal fixation criterion.
-        # Could call them something else "PURSUIT" ?
-        
-        elif sacc_end - sacc_start < 21 and sacc_end - sacc_start > 9 and\
-                not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
-            sacc_data = data[sacc_start:sacc_end]
-            pv, amp, avVel = get_signal_props(sacc_data, px2deg)
-            sacc_duration = sacc_end - sacc_start
-            events.append((
-                "FIX",
-                sacc_start,
-                sacc_end,
-                sacc_data[0]['x'],
-                sacc_data[0]['y'],
-                sacc_data[-1]['x'],
-                sacc_data[-1]['y'],
-                amp,
-                pv,
-                avVel,
-                sacc_duration))
-                
+ 
 ######## end of saccade detection = begin of glissade detection ########
-
-        idx = sacc_end + 1
-#        below=False
-#        offset=False
-        # pval=[]
-        #sacc_data
 
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match

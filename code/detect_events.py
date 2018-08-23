@@ -89,8 +89,7 @@ def find_saccades(vels, threshold):
 
 
 def get_saccade_end_velocity_threshold(vels, start_idx, width, soft_threshold):
-        # TODO prevent negative index
-        off_period_vel = vels[start_idx - width - 1:start_idx]
+        off_period_vel = vels[max(0, start_idx - width - 1):start_idx]
         # exclude NaN
         off_period_vel = off_period_vel[~np.isnan(off_period_vel)]
         # go with adaptive threshold, but only if the window prior to the saccade

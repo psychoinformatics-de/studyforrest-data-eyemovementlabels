@@ -18,28 +18,50 @@ def get_signal_props(data, px2deg):
     return pv, amp, avVel
 
 
-def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
-#####get threshold function #######
-    newThr=200                              # What is this "threshold"?
-    def getThresh(cut):                     # def refers to defining your own function; cut is input arg
+def get_adaptive_saccade_velocity_threshold(data, start=300.0):
+    """Determine saccade velocity threshold.
+
+    Takes global noise-level of data into account. Implementation
+    based on algorithm proposed by NYSTROM and HOLMQVIST (2010).
+
+    Parameters
+    ----------
+    start : float
+      Start velocity for adaptation algorithm. Should be larger than
+      any conceivable minimal saccade velocity (in deg/s).
+    TODO std unit multipliers
+
+    Returns
+    -------
+    tuple
+      (saccade velocity threshold, soft velocity threshold). The latter
+      (and lower) value can be used to determine a more precise saccade onset.
+    """
+    cur_thresh = start
+
+    def _get_thresh(cut):
+        # helper function
         vel_uthr = data['vel'][data['vel'] < cut]
         avg = vel_uthr.mean()
         sd = vel_uthr.std()
-        return avg+6*sd, avg, sd            # outputs of function; average+6*sd denotes a RANGE in any normal distribution
+        return avg + 6 * sd, avg, sd
 
-###### threshold function #########      NYSTROM and HOLMQVIST (2010) ALGORITHM IS USED to find a suitable threshold  
-
-    dif=2
-    while dif > 1:
-        oldThr = newThr                      #Threshold in 100-300 degree/sec. 200 here.
-        newThr, avg, sd = getThresh(oldThr)  #Average and std is calculated and Thr is renewed
+    # re-compute threshold until value converges
+    dif = 2
+    while dif > 1:  # less than 1deg/s difference
+        old_thresh = cur_thresh
+        cur_thresh, avg, sd = _get_thresh(old_thresh)
         lgr.info(
             'Saccade threshold velocity: %.1f (non-saccade mvel: %.1f, stdvel: %.1f)',
-            newThr, avg, sd)
-        dif= abs(oldThr - newThr)           #return absolute value, keep doing the loop until PTn-PTn-1 is smaller than 1 degre1e
+            cur_thresh, avg, sd)
+        dif = abs(old_thresh - cur_thresh)
 
-    threshold=newThr
-    soft_threshold = avg + 3 * sd
+    return cur_thresh, avg + 3 * sd
+
+
+def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
+    # find velocity thresholds for saccade detection
+    threshold, soft_threshold = get_adaptive_saccade_velocity_threshold(data)
 
     events = []
     peaks = []

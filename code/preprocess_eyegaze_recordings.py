@@ -121,7 +121,7 @@ if __name__ == '__main__':
         delimiter='\t',
         names=['x', 'y', 'pupil', 'frame'])
 
-    preproc(data, outfpath, px2deg)
+    data = preproc(data, outfpath, px2deg)
 
     # TODO think about just saving it in binary form
     np.savetxt(

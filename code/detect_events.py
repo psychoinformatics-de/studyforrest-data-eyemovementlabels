@@ -216,9 +216,11 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
     # currently completely ignored
     if not fix:
         # we got nothing whatsoever, the whole thing is a fixation
-        fix = [0 , -(len(data) - 1)]
+        fix.append(0)
+    if not fix[-1] < 0:
+        # end of fixation it missing
+        fix.append(-(len(data) - 1))
 
-    print('FIX', fix)
     for j, f in enumerate(fix[:-1]):
         fix_start = f
         # end times are coded negative

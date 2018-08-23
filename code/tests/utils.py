@@ -2,7 +2,6 @@ import numpy as np
 
 
 def get_noise(size, loc, std):
-    print("NOISE", size, loc, std)
     noise = np.random.randn(size)
     noise *= std
     noise += loc

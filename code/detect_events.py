@@ -2,16 +2,12 @@
 # -*- coding: iso-8859-15 -*-
 import numpy as np
 from scipy import ndimage
-import os
-from os.path import join as opj
 import sys
 import gzip
-from os.path import basename
-from os.path import exists
-from glob import glob
 
-#infile = sys.argv[1]
-#outfile = sys.argv[2]
+import logging
+lgr = logging.getLogger('studyforrest.detect_eyegaze_events')
+
 
 def get_signal_props(data, px2deg):
     data = data[~np.isnan(data['vel'])]
@@ -22,9 +18,7 @@ def get_signal_props(data, px2deg):
     return pv, amp, avVel
 
 
-def detect(data, fixation_threshold, px2deg):
-    print ("Data length", len(data))
-
+def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
 #####get threshold function #######
     newThr=200                              # What is this "threshold"?
     def getThresh(cut):                     # def refers to defining your own function; cut is input arg
@@ -39,7 +33,10 @@ def detect(data, fixation_threshold, px2deg):
     while dif > 1:
         oldThr = newThr                      #Threshold in 100-300 degree/sec. 200 here.
         newThr, avg, sd = getThresh(oldThr)  #Average and std is calculated and Thr is renewed
-        dif= abs(oldThr - newThr)           #return absolute value, keep doing the loop until PTn-PTn-1 is smaller than 1 degree
+        lgr.info(
+            'Saccade threshold velocity: %.1f (non-saccade mvel: %.1f, stdvel: %.1f)',
+            newThr, avg, sd)
+        dif= abs(oldThr - newThr)           #return absolute value, keep doing the loop until PTn-PTn-1 is smaller than 1 degre1e
 
     threshold=newThr
     soft_threshold = avg + 3 * sd
@@ -178,23 +175,28 @@ def detect(data, fixation_threshold, px2deg):
 
 ######### fixation detection after everything else is identified ########
 
+    if not fix:
+        # we got nothing whatsoever, the whole thing is a fixation
+        fix = [0 , -(len(data) - 1)]
+
     for j, f in enumerate(fix[:-1]):
         fix_start = f
         # end times are coded negative
         fix_end = abs(fix[j + 1])
-        if f > 0 and fix_end - f > 40:          #onset of fixation
+        if f >= 0 and fix_end - f > 40:          #onset of fixation
             fixdata = data[f:fix_end]
             if not len(fixdata) or np.isnan(fixdata[0][0]):
-                print("Erroneous fixation interval")
+                lgr.error("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
+            lgr.warn('%f, %f, %f', pv, amp, avVel)
             fix_duration = fix_end - f
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
                     "FIX",
-                    f,
-                    fix[j + 1],
+                    f / sampling_rate,
+                    abs(fix[j + 1]) / sampling_rate,
                     data[f]['x'],
                     data[f]['y'],
                     data[fix_end]['x'],
@@ -202,7 +204,7 @@ def detect(data, fixation_threshold, px2deg):
                     amp,
                     pv,
                     avVel,
-                    fix_duration))
+                    fix_duration / sampling_rate))
 
     return events
 

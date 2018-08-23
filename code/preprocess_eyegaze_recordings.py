@@ -59,7 +59,8 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
             i = i + 1
             if (clusters == i).sum() <= min_blink_duration:
                 clusters[clusters == i] = 0
-        # mask to cover all samples with dataloss > `min_blink_duration`, plus `dilate_blink`
+        # mask to cover all samples with dataloss > `min_blink_duration`,
+        # plus `dilate_blink`
         # samples on either side of the lost segment
         mask = ndimage.binary_dilation(clusters > 0, iterations=dilate_nan)
         data['x'][mask] = np.nan
@@ -70,22 +71,22 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
         data['x'] = savgol_filter(data['x'], savgol_length, savgol_polyord)
         data['y'] = savgol_filter(data['y'], savgol_length, savgol_polyord)
 
-    #velocity calculation, exclude velocities over 1000
+    # velocity calculation, exclude velocities over `max_vel`
     # euclidean distance between successive coordinate samples
-    # no entry for first datapoint
+    # no entry for first datapoint!
     velocities = (np.diff(data['x']) ** 2 + np.diff(data['y']) ** 2) ** 0.5
     # convert from px/sample to deg/s
     velocities *= px2deg * sampling_rate
 
     # replace "too fast" velocities with previous velocity
+    # add missing first datapoint
     filtered_velocities = [float(0)]
     for vel in velocities:
-        # TODO make threshold a parameter
         if vel > max_vel:  # deg/s
             # ignore very fast velocities
             lgr.warning(
-                'Computed velocity exceeds threshold. Inappropriate filter setup? '
-                '[%.1f > %.1f deg/s]',
+                'Computed velocity exceeds threshold. '
+                'Inappropriate filter setup? [%.1f > %.1f deg/s]',
                 vel,
                 max_vel)
             vel = filtered_velocities[-1]

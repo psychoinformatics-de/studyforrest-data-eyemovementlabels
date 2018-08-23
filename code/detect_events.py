@@ -141,9 +141,13 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         # velocity threshold was exceeded
         sacc_end = max(sacc_start + 1, pos)
 
+        # shift saccade end index to the first element that is below the
+        # velocity threshold
         while sacc_end < len(data) - 1 > 0 and \
-                (velocities[sacc_end] > off_threshold or \
-                 np.isnan(velocities[sacc_end])):
+                velocities[sacc_end] > off_threshold:
+                # we used to do this, but it could mean detecting very long
+                # saccades that consist of (mostly) missing data
+                #    or np.isnan(velocities[sacc_end])):
             sacc_end += 1
         # mark start of a fixation
         fix.append(sacc_end)

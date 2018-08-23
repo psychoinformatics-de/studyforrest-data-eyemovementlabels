@@ -124,8 +124,10 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
             #         or np.isnan(velocities[sacc_start])):
             sacc_start -= 1
 
-        # TODO: make sane
-        # this is chinese for saying "I am not a fixation anymore"
+        if not fix:
+            # start with a fixation
+            fix.append(0)
+        # this is sophisticated for saying "I am not a fixation anymore"
         fix.append(-(sacc_start - 1))
 
         # determine velocity threshold for the saccade end, based on
@@ -152,8 +154,9 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         # mark start of a fixation
         fix.append(sacc_end)
 
-        # minimum duration 9 ms and no blinks allowed (!) If we increase this then saccades higher than 9ms will be considered as fixations too --- we can now get the "short" saccades
-
+        # minimum duration 9 ms and no blinks allowed
+        # second test should be redundant, but we leave it, because the cost
+        # is low
         if sacc_end - sacc_start >= 9 and\
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
@@ -172,8 +175,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 pv,
                 avVel,
                 sacc_duration))
- 
-######## end of saccade detection = begin of glissade detection ########
 
         # TODO investigate NOISE_SEED=38136835 for a failed glissage detection
         gldata = data[sacc_end:sacc_end + 40]
@@ -217,6 +218,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         # we got nothing whatsoever, the whole thing is a fixation
         fix = [0 , -(len(data) - 1)]
 
+    print('FIX', fix)
     for j, f in enumerate(fix[:-1]):
         fix_start = f
         # end times are coded negative

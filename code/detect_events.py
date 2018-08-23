@@ -136,10 +136,11 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
             40,
             soft_threshold)
 
-        # saccade end must be at least one sample after the start, or the decision
-        # logic below is invalid, this is OK as we are sure that the velocity
-        # threshold was exceeded
-        sacc_end = pos + 1
+        # saccade end must be at least one sample after the start, or the
+        # decision logic below is invalid, this is OK as we are sure that the
+        # velocity threshold was exceeded
+        sacc_end = max(sacc_start + 1, pos)
+
         while sacc_end < len(data) - 1 > 0 and \
                 (velocities[sacc_end] > off_threshold or \
                  np.isnan(velocities[sacc_end])):

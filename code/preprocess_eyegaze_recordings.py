@@ -1,98 +1,130 @@
 #!/usr/bin/python
-# -*- coding: iso-8859-15 -*-
+# -*- coding: utf-8 -*-
 
 import sys
 import numpy as np
 from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing data
 from scipy import ndimage as ndimage
-from glob import glob                  # The glob.glob returns the list of files with their full path
-import gzip
 import os
-from os.path import basename           # returns the tail of the path
-from os.path import dirname
-from os.path import curdir
-from os.path import exists             # logical for if a certain file exists
-from os.path import join as opj
+import os.path as op
 
-sampling_rate = 1000.0  # in Hertz
+import logging
+lgr = logging.getLogger('studyforrest.preproc_eyegaze')
 
 
-def preproc(infile, outfile, px2deg):
-    # TODO parameter
-    # max_signal_loss_without_something
-    # blank_duration
-    # savgol_window_length
-    # savgol_polyord
-    # savgol_iterations
+def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
+            savgol_length=0.019, savgol_polyord=1, sampling_rate=1000.0,
+            max_vel=1000.0):
+    """
+    Parameters
+    ----------
+    data : array
+      Record array with fields ('x', 'y', 'pupil')
+    px2deg : float
+      Size of a pixel in visual angles.
+    min_blink_duration : float
+      In seconds. Any signal loss shorter than this duration with not be
+      considered for `dilate_blink`.
+    dilate_blink : float
+      Duration by which to dilate a blink window (missing data segment) on
+      either side (in seconds).
+    savgol_length : float
+      Filter window length in seconds.
+    savgol_polyord : int
+      Filter polynomial order used to fit the samples.
+    sampling_rate : float
+      In Hertz
+    max_vel : float
+      Maximum velocity in deg/s. Any velocity value larger than this threshold
+      will be replaced by the previous velocity value. Additionally a warning
+      will be issued to indicate a potentially inappropriate filter setup.
+    """
+    # convert params in seconds to #samples
+    dilate_nan = int(dilate_nan * sampling_rate)
+    min_blink_duration = int(min_blink_duration * sampling_rate)
+    savgol_length = int(savgol_length * sampling_rate)
 
-    outdir = dirname(outfile)
-    outdir = curdir if not outdir else outdir
-    if not exists(outdir):
-        os.makedirs(outdir)
+    # we do not want to change the original data
+    data = data.copy()
 
-    data = np.recfromcsv(
-        infile,
-        delimiter='\t',
-        names=['x', 'y', 'pupil', 'frame'])
-
-    # for signal loss exceeding 20 ms, additional 10 ms at beginning
+    # for signal loss exceeding the minimum blink duration, add additional
+    # dilate_nan at either end
     # find clusters of "no data"
-    clusters, nclusters = ndimage.label(np.isnan(data['x']))
-    # go through all clusters and remove any cluster that is less than 20 samples
-    for i in range(1, nclusters):
-        if (clusters == i).sum() <= 20:
-            clusters[clusters == i] = 0
-    # mask to cover all samples with dataloss > 20ms, plus 10 samples on either
-    # side of the lost segment
-    mask = ndimage.binary_dilation(clusters > 0, iterations=10)
-    data['x'][mask] = np.nan
-    data['y'][mask] = np.nan
-    data['pupil'][mask] = np.nan
+    if dilate_nan:
+        clusters, nclusters = ndimage.label(np.isnan(data['x']))
+        # go through all clusters and remove any cluster that is less than the minimum
+        # "blink" duration
+        for i in range(nclusters):
+            # cluster index is base1
+            i = i + 1
+            if (clusters == i).sum() <= min_blink_duration:
+                clusters[clusters == i] = 0
+        # mask to cover all samples with dataloss > `min_blink_duration`, plus `dilate_blink`
+        # samples on either side of the lost segment
+        mask = ndimage.binary_dilation(clusters > 0, iterations=dilate_nan)
+        data['x'][mask] = np.nan
+        data['y'][mask] = np.nan
+        data['pupil'][mask] = np.nan
 
-    # TODO filtering with NaNs in place kicks out additional datapoints, maybe
-    # do no or less dilation of the mask above
-    data['x'] = savgol_filter(data['x'], 19, 1)
-    data['y'] = savgol_filter(data['y'], 19, 1)
+    if savgol_length:
+        data['x'] = savgol_filter(data['x'], savgol_length, savgol_polyord)
+        data['y'] = savgol_filter(data['y'], savgol_length, savgol_polyord)
 
     #velocity calculation, exclude velocities over 1000
-
     # euclidean distance between successive coordinate samples
     # no entry for first datapoint
     velocities = (np.diff(data['x']) ** 2 + np.diff(data['y']) ** 2) ** 0.5
-
-    # convert from px/msec to deg/s
+    # convert from px/sample to deg/s
     velocities *= px2deg * sampling_rate
 
     # replace "too fast" velocities with previous velocity
-    accelerations = [float(0)]
     filtered_velocities = [float(0)]
     for vel in velocities:
         # TODO make threshold a parameter
-        if vel > 1000:  # deg/s
+        if vel > max_vel:  # deg/s
             # ignore very fast velocities
+            lgr.warning(
+                'Computed velocity exceeds threshold. Inappropriate filter setup? '
+                '[%.1f > %.1f deg/s]',
+                vel,
+                max_vel)
             vel = filtered_velocities[-1]
-        # acceleration is change of velocities over the last msec
-        accelerations.append((vel - filtered_velocities[-1]) * sampling_rate)
         filtered_velocities.append(vel)
-    # TODO report how often that happens
+    velocities = np.array(filtered_velocities)
 
-    #save data to file
-    data=np.array([
-        filtered_velocities,
-        accelerations,
+    # acceleration is change of velocities over the last time unit
+    acceleration = np.zeros(velocities.shape, velocities.dtype)
+    acceleration[1:] = (velocities[1:] - velocities[:-1]) * sampling_rate
+
+    return np.core.records.fromarrays([
+        velocities,
+        acceleration,
         # TODO add time np.arange(len(filtered_velocities))
         data['x'],
-        data['y']])
+        data['y']],
+        names=['vel', 'acc', 'x', 'y'])
 
-    # TODO think about just saving it in binary form
-    np.savetxt(
-        outfile,
-        data.T,
-        fmt=['%f', '%f', '%f', '%f'],
-        delimiter='\t')
 
 if __name__ == '__main__':
     px2deg = float(sys.argv[1])
     infpath = sys.argv[2]
     outfpath = sys.argv[3]
-    preproc(infpath, outfpath, px2deg)
+
+    outdir = op.dirname(outfpath)
+    outdir = op.curdir if not outdir else outdir
+    if not op.exists(outdir):
+        os.makedirs(outdir)
+
+    data = np.recfromcsv(
+        infpath,
+        delimiter='\t',
+        names=['x', 'y', 'pupil', 'frame'])
+
+    preproc(data, outfpath, px2deg)
+
+    # TODO think about just saving it in binary form
+    np.savetxt(
+        outfpath,
+        data.T,
+        fmt=['%f', '%f', '%f', '%f'],
+        delimiter='\t')

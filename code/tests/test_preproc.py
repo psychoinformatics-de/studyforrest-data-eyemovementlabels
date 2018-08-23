@@ -15,7 +15,7 @@ def test_preproc():
     p = pp.preproc(data, savgol_length=0.019, savgol_polyord=1, **common_args)
     # first values are always zero
     assert p[0]['vel'] == 0
-    assert p[0]['acc'] == 0
+    assert p[0]['accel'] == 0
     p = p['x']
     # shorter filter leaves more "noise"
     p_linshort = pp.preproc(data, savgol_length=0.009, savgol_polyord=1,
@@ -63,10 +63,10 @@ def test_preproc():
                    sampling_rate=10.0)
     # 2 deg in 0.1s -> 20deg/s
     assert p['vel'][-1] == 20
-    assert p['acc'][-1] == 200
+    assert p['accel'][-1] == 200
 
     data['x'][1] = 200
     p = pp.preproc(data, px2deg=1.0, savgol_length=0, dilate_nan=0,
                    sampling_rate=10.0)
     assert p['vel'][-1] == 0
-    assert p['acc'][-1] == 0
+    assert p['accel'][-1] == 0

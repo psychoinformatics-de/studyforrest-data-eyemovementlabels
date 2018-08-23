@@ -103,7 +103,7 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
         # TODO add time np.arange(len(filtered_velocities))
         data['x'],
         data['y']],
-        names=['vel', 'acc', 'x', 'y'])
+        names=['vel', 'accel', 'x', 'y'])
 
 
 if __name__ == '__main__':

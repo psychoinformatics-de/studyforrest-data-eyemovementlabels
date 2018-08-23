@@ -22,14 +22,8 @@ def get_signal_props(data, px2deg):
     return pv, amp, avVel
 
 
-def detect(infile, outfile, fixation_threshold, px2deg):
-    data = np.recfromcsv(
-        infile,
-        delimiter='\t',
-        names=['vel', 'accel', 'x', 'y'])
+def detect(data, fixation_threshold, px2deg):
     print ("Data length", len(data))
-
-    out=gzip.open(outfile,"wb")
 
 #####get threshold function #######
     newThr=200                              # What is this "threshold"?
@@ -210,12 +204,7 @@ def detect(infile, outfile, fixation_threshold, px2deg):
                     avVel,
                     fix_duration))
 
-
-    # TODO think about just saving it in binary form
-    f = gzip.open (outfile, "w")
-    for e in events:
-        f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
-    print ("done")
+    return events
 
 
 if __name__ == '__main__':
@@ -223,7 +212,20 @@ if __name__ == '__main__':
     px2deg = float(sys.argv[2])
     infpath = sys.argv[3]
     outfpath = sys.argv[4]
-    detect(infpath, outfpath, fixation_threshold, px2deg)
+    data = np.recfromcsv(
+        infpath,
+        delimiter='\t',
+        names=['vel', 'accel', 'x', 'y'])
+
+    events = detect(data, outfpath, fixation_threshold, px2deg)
+
+    # TODO think about just saving it in binary form
+    f = gzip.open(outfpath, "w")
+    for e in events:
+        f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+    print ("done")
+
+
 
 
 

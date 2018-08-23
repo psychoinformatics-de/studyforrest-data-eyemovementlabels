@@ -56,7 +56,47 @@ def get_adaptive_saccade_velocity_threshold(data, start=300.0):
             cur_thresh, avg, sd)
         dif = abs(old_thresh - cur_thresh)
 
-    return cur_thresh, avg + 3 * sd
+    return cur_thresh, (avg + 3 * sd)
+
+
+def find_saccades(vels, soft_threshold, threshold):
+    """Find time periods with saccades
+
+    Parameters
+    ----------
+    vels : array
+      Velocities.
+    soft_threshold : float
+      Velocity threshold to determine time periods that might contain
+      a saccade.
+    threshold : float
+      Velocity threshold to identify the start of a saccade.
+
+    Returns
+    -------
+    locs, clusters
+      `loc` is a list of indices of the `vels` array where the saccade
+      velocity threshold has been exceeded and the previous sample was still
+      below the threshold.
+    """
+
+    # TODO this is expensive and apparently useless, a simple threshold would do
+    above_thr_clusters, nclusters = ndimage.label(vels > soft_threshold)
+    if nclusters:
+        # reinclude any timepoint that has missing data, and treat it as above
+        # threshold
+        # XXX could this possibly introduce fake saccades? MIH think
+        # not, but isnt sure
+        above_thr_clusters[np.isnan(vels)] = 1
+        # saccade location is the first velocity that goes above
+        # the saccade threshold (NOT VELOCITY threshold)
+        locs = np.where(
+            np.logical_and(
+                vels[:-1] < threshold,
+                vels[1:] > threshold))[0]
+    else:
+        lgr.warn('Got no above saccade threshold velocity values')
+    return locs, above_thr_clusters
 
 
 def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
@@ -65,21 +105,12 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
 
     events = []
     peaks = []
+    fix=[]
 
-    above_thr_clusters, nclusters = ndimage.label(data['vel'] > soft_threshold)
-    if nclusters:
-        # reinclude any timepoint that has missing data, and treat it as above threshold
-        # XXX could this possibly introduce fake saccades? MIH think not, but isnt sure
-        above_thr_clusters[np.isnan(data['vel'])] = 1
-        fix=[]
-        # Saccade by definition, is the first velocity that goes above
-        # the saccade threshold (NOT VELOCITY threshold)
-        peaks = np.where(
-            np.logical_and(
-                data['vel'][:-1] < threshold,
-                data['vel'][1:] > threshold))[0]
-    else:
-        lgr.warn('Got no above saccade threshold velocity values')
+    peaks, above_thr_clusters = find_saccades(
+        data['vel'],
+        soft_threshold,
+        threshold)
 
     for i, pos in enumerate(peaks):
         sacc_start = pos
@@ -98,7 +129,10 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                         (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
                         if len(off_period_vel) > 40 else soft_threshold
 
-        sacc_end = pos
+        # saccade end must be at least one sample after the start, or the decision
+        # logic below is invalid, this is OK as we are sure that the velocity
+        # threshold was exceeded
+        sacc_end = pos + 1
         while sacc_end < len(data) - 1 > 0 and \
                 (data['vel'][sacc_end] > off_threshold or \
                  np.isnan(data['vel'][sacc_end])):

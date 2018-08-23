@@ -24,5 +24,9 @@ def test_one_saccade():
     samp = ut.mk_gaze_sample()
 
     data = ut.expand_samp(samp, y=0.0)
-    p = pp.preproc(data, savgol_length=0.0, dilate_nan=0, **common_args)
-    #print(detect(p, 50.0, **common_args))
+    p = pp.preproc(data, savgol_length=0.019, dilate_nan=0, **common_args)
+    events = detect(p, 50.0, **common_args)
+    assert events is not None
+    # we find at least the saccade
+    assert len(events) > 1
+    assert events['label'][0] == 'SACCADE'

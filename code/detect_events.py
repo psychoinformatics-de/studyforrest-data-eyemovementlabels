@@ -103,8 +103,10 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
     for i, pos in enumerate(peaks):
         sacc_start = pos
         while sacc_start > 0 \
-                and (data['vel'][sacc_start] > soft_threshold \
-                     or np.isnan(data['vel'][sacc_start])):
+                and (data['vel'][sacc_start] > soft_threshold):
+            # we used to do this, but it could mean detecting very long
+            # saccades that consist of (mostly) missing data
+            #         or np.isnan(data['vel'][sacc_start])):
             sacc_start -= 1
 
         # TODO: make sane

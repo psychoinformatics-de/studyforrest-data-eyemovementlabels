@@ -157,6 +157,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
  
 ######## end of saccade detection = begin of glissade detection ########
 
+        # TODO investigate NOISE_SEED=38136835 for a failed glissage detection
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match
         for i in range(0, len(gldata) - 2):
@@ -168,14 +169,16 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 gliss_data = gldata[:-i]
                 gliss_end = sacc_end + len(gldata) - i
 
-                if not len(gliss_data) or np.sum(np.isnan(gliss_data['vel'])) > 10:
+                if not len(gliss_data) or \
+                        np.sum(np.isnan(gliss_data['vel'])) > 10:
                     # not more than 10 ms of signal loss in glissades
                     break
                 pv, amp, avVel = get_signal_props(gliss_data, px2deg)
                 gl_duration = gliss_end - (sacc_end + 1)
                 events.append((
                     "GLISSADE",
-                    sacc_end + 1,
+                    # TODO should yield times not idx
+                    sacc_end,
                     gliss_end,
                     gldata[0]['x'],
                     gldata[0]['y'],

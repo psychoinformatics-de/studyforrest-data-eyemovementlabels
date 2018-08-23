@@ -1,4 +1,16 @@
 import numpy as np
+import os
+
+import logging
+lgr = logging.getLogger('studyforrest.utils')
+
+
+if 'NOISE_SEED' in os.environ:
+    seed = int(os.environ['NOISE_SEED'])
+else:
+    seed = np.random.randint(100000000)
+    lgr.warn('RANDOM SEED: %i', seed)
+np.random.seed(seed)
 
 
 def get_noise(size, loc, std):
@@ -16,12 +28,12 @@ def mk_gaze_sample(
         pre_fix=1000,
         post_fix=1000,
         fix_std=5,
-        sacc=50,
+        sacc=20,
         sacc_dist=200,
         glis=40,
         glis_dist=-40,
         start_x=0.0,
-        noise_std=5,
+        noise_std=2,
         ):
     duration = pre_fix + sacc + glis + post_fix
     samp = np.empty(duration)

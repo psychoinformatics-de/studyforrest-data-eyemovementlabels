@@ -174,21 +174,21 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
         fix_start = f
         # end times are coded negative
         fix_end = abs(fix[j + 1])
-        if f >= 0 and fix_end - f > 40:          #onset of fixation
-            fixdata = data[f:fix_end]
+        if fix_start >= 0 and fix_end - f > 40:          #onset of fixation
+            fixdata = data[fix_start:fix_end]
             if not len(fixdata) or np.isnan(fixdata[0][0]):
                 lgr.error("Erroneous fixation interval")
                 continue
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
-            fix_duration = fix_end - f
+            fix_duration = fix_end - fix_start
 
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
                     "FIX",
-                    f / sampling_rate,
+                    fix_start / sampling_rate,
                     abs(fix[j + 1]) / sampling_rate,
-                    data[f]['x'],
-                    data[f]['y'],
+                    data[fix_start]['x'],
+                    data[fix_start]['y'],
                     data[fix_end]['x'],
                     data[fix_end]['y'],
                     amp,

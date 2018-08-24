@@ -9,6 +9,15 @@ common_args = dict(
 )
 
 
+def test_spike_filter():
+    samp = np.random.randn(1000)
+    data = ut.expand_samp(samp, y=0.0)
+    p = pp.filter_spikes(data.copy())
+    assert np.std(data['x']) > np.std(p['x'])
+    assert data['x'][0] == p['x'][0]
+    assert data['x'][-1] == p['x'][-1]
+
+
 def test_preproc():
     samp = np.random.randn(1000)
     data = ut.expand_samp(samp, y=0.0)

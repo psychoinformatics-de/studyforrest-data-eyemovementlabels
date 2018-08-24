@@ -12,6 +12,36 @@ import logging
 lgr = logging.getLogger('studyforrest.preproc_eyegaze')
 
 
+def filter_spikes(data):
+    """In-place high-frequency spike filter
+
+    Inspired by:
+
+      Stampe, D. M. (1993). Heuristic filtering and reliable calibration
+      methods for video-based pupil-tracking systems. Behavior Research
+      Methods, Instruments, & Computers, 25(2), 137–142.
+      doi:10.3758/bf03204486
+    """
+    def _filter(arr):
+        # over all triples of neighboring samples
+        for i in range(1, len(arr) - 1):
+            if (arr[i - 1] < arr[i] and arr[i] > arr[i + 1]) \
+                    or (arr[i - 1] > arr[i] and arr[i] < arr[i + 1]):
+                # immediate sign-reversal of the difference from
+                # x-1 -> x -> x+1
+                prev_dist = abs(arr[i - 1] - arr[i])
+                next_dist = abs(arr[i + 1] - arr[i])
+                # replace x by the neighboring value that is closest
+                # in value
+                arr[i] = arr[i - 1] \
+                    if prev_dist < next_dist else arr[i + 1]
+        return arr
+
+    data['x'] = _filter(data['x'])
+    data['y'] = _filter(data['y'])
+    return data
+
+
 def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
             savgol_length=0.019, savgol_polyord=1, sampling_rate=1000.0,
             max_vel=1000.0):

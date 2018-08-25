@@ -165,8 +165,8 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
             events.append((
                 "SACCADE",
                 # TODO should yield times not idx
-                sacc_start,
-                sacc_end,
+                sacc_start / sampling_rate,
+                sacc_end / sampling_rate,
                 sacc_data[0]['x'],
                 sacc_data[0]['y'],
                 sacc_data[-1]['x'],
@@ -197,8 +197,8 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 events.append((
                     "GLISSADE",
                     # TODO should yield times not idx
-                    sacc_end,
-                    gliss_end,
+                    sacc_end / sampling_rate,
+                    gliss_end / sampling_rate,
                     gldata[0]['x'],
                     gldata[0]['y'],
                     gldata[-i]['x'],

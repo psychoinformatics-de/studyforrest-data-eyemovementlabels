@@ -75,7 +75,7 @@ def samp2file(data, fname):
         delimiter='\t')
 
 
-def show_gaze(data=None, pp=None, events=None):
+def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
     colors = {
         'FIX': 'gray',
         'SACCADE': 'green',
@@ -84,9 +84,15 @@ def show_gaze(data=None, pp=None, events=None):
 
     import pylab as pl
     if data is not None:
-        pl.plot(data['x'], color='blue')
+        pl.plot(
+            np.linspace(0, len(data) / sampling_rate, len(data)),
+            data['x'],
+            color='blue')
     if pp is not None:
-        pl.plot(pp['x'], color='orange')
+        pl.plot(
+            np.linspace(0, len(pp) / sampling_rate, len(pp)),
+            pp['x'],
+            color='orange')
     if events is not None:
         for ev in events:
             pl.axvspan(

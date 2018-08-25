@@ -18,6 +18,18 @@ def test_no_saccade():
     events = detect(p, 50.0, **common_args)
     assert len(events) == 1
     assert events[0]['duration'] == 1.0
+    assert events[0]['label'] == 'FIX'
+
+    # little missing data makes no diff
+    p[500:510] = np.nan
+    events = detect(p, 50.0, **common_args)
+    assert len(events) == 1
+    assert events[0]['duration'] == 1.0
+    assert events[0]['label'] == 'FIX'
+
+    # but more kills it, TODO why?
+    p[500:550] = np.nan
+    assert detect(p, 50.0, **common_args) is None
 
 
 def test_one_saccade():

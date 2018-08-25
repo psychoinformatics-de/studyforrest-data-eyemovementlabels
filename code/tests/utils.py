@@ -30,7 +30,7 @@ def mk_gaze_sample(
         fix_std=5,
         sacc=20,
         sacc_dist=200,
-        glis=40,
+        glis=30,
         glis_dist=-40,
         start_x=0.0,
         noise_std=2,
@@ -73,3 +73,26 @@ def samp2file(data, fname):
         data.T,
         fmt=['%.1f', '%.1f', '%.1f', '%i'],
         delimiter='\t')
+
+
+def show_gaze(data=None, pp=None, events=None):
+    colors = {
+        'FIX': 'gray',
+        'SACCADE': 'green',
+        'GLISSADE': 'yellow',
+    }
+
+    import pylab as pl
+    if data is not None:
+        pl.plot(data['x'], color='blue')
+    if pp is not None:
+        pl.plot(pp['x'], color='orange')
+    if events is not None:
+        for ev in events:
+            pl.axvspan(
+                ev['start_time'],
+                ev['end_time'],
+                color=colors[ev['label']],
+                alpha=0.3)
+    pl.show()
+ 

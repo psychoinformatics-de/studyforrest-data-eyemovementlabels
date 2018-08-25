@@ -24,10 +24,20 @@ def test_one_saccade():
     samp = ut.mk_gaze_sample()
 
     data = ut.expand_samp(samp, y=0.0)
-    p = pp.preproc(data, savgol_length=0.019, dilate_nan=0, **common_args)
+    nospikes = pp.filter_spikes(data.copy())
+    p = pp.preproc(
+        nospikes, savgol_length=0.019, savgol_polyord=2,
+        dilate_nan=0, **common_args)
     events = detect(p, 50.0, **common_args)
+    ut.show_gaze(data, p, events)
     print(events)
     assert events is not None
     # we find at least the saccade
     assert len(events) > 1
     assert events['label'][0] == 'SACCADE'
+    # last one is always a fixation
+    assert events['label'][-1] == 'FIX'
+    if len(events) > 2:
+        assert events['label'][1] == 'GLISSADE'
+        # a glissade start equals the end of the preceding saccade
+        assert events['start_time'][1] == events['end_time'][0]

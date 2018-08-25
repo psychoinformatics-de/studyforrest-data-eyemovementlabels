@@ -220,6 +220,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
         fix.append(-(len(data) - 1))
 
     for j, f in enumerate(fix[:-1]):
+        # TODO this should skip every other index (end times)!
         fix_start = f
         # end times are coded negative
         fix_end = abs(fix[j + 1])
@@ -231,6 +232,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
             pv, amp, avVel = get_signal_props(fixdata, px2deg)
             fix_duration = fix_end - fix_start
 
+            # TODO if there is too much data loss, split fixation in multiple parts
             if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
                     "FIX",

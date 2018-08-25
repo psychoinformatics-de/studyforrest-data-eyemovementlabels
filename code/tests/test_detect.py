@@ -27,7 +27,7 @@ def test_no_saccade():
     assert events[0]['duration'] == 1.0
     assert events[0]['label'] == 'FIX'
 
-    # but more kills it, TODO why?
+    # but more kills it
     p[500:550] = np.nan
     assert detect(p, 50.0, **common_args) is None
 

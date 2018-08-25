@@ -44,7 +44,7 @@ def test_one_saccade():
     assert events is not None
     # we find at least the saccade
     assert len(events) == 4
-    assert list(events['label']) == ['FIX', 'SACCADE', 'GLISSADE', 'FIX']
+    assert list(events['label']) == ['FIX', 'SAC', 'PSO', 'FIX']
     for i in range(0, len(events) - 1):
         # complete segmentation
         assert events['start_time'][i + 1] == events['end_time'][i]

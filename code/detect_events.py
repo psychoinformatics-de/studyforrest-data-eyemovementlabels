@@ -164,7 +164,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
             pv, amp, avVel = get_signal_props(sacc_data, px2deg)
             sacc_duration = sacc_end - sacc_start
             events.append((
-                "SACCADE",
+                "SAC",
                 sacc_start / sampling_rate,
                 sacc_end / sampling_rate,
                 sacc_data[0]['x'],
@@ -189,12 +189,13 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
 
                 if not len(gliss_data) or \
                         np.sum(np.isnan(gliss_data['vel'])) > 10:
-                    # not more than 10 ms of signal loss in glissades
+                    # not more than 10 ms of signal loss in post saccadic
+                    # oscilations/glissades
                     break
                 pv, amp, avVel = get_signal_props(gliss_data, px2deg)
                 gl_duration = gliss_end - (sacc_end + 1)
                 events.append((
-                    "GLISSADE",
+                    "PSO",
                     sacc_end / sampling_rate,
                     gliss_end / sampling_rate,
                     gldata[0]['x'],

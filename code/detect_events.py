@@ -128,7 +128,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
             # start with a fixation
             fix.append(0)
         # this is sophisticated for saying "I am not a fixation anymore"
-        fix.append(-(sacc_start - 1))
+        fix.append(-sacc_start)
 
         # determine velocity threshold for the saccade end, based on
         # velocity stdev immediately prior the saccade start

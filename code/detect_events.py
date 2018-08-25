@@ -101,7 +101,8 @@ def get_saccade_end_velocity_threshold(vels, start_idx, width, soft_threshold):
     return off_threshold
 
 
-def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
+def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
+           sort_events=True):
     # find velocity thresholds for saccade detection
     threshold, soft_threshold = get_adaptive_saccade_velocity_threshold(data)
 
@@ -175,7 +176,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 avVel,
                 sacc_duration))
 
-        # TODO investigate NOISE_SEED=38136835 for a failed glissage detection
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match
         for i in range(0, len(gldata) - 2):
@@ -246,10 +246,16 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
 
     field_names = ['label', 'start_time', 'end_time', 'start_x', 'start_y',
                    'end_x', 'end_y', 'dist', 'peak_vel', 'avg_vel', 'duration']
-    return np.core.records.fromrecords(
+    events = np.core.records.fromrecords(
         events,
         names=field_names,
     ) if events else None
+
+    if events is not None and sort_events:
+        events.sort(order='start_time')
+        return events
+    else:
+        return events
 
 
 if __name__ == '__main__':

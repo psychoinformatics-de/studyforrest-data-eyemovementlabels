@@ -101,4 +101,3 @@ def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
                 color=colors[ev['label']],
                 alpha=0.3)
     pl.show()
- 

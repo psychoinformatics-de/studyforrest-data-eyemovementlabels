@@ -29,15 +29,10 @@ def test_one_saccade():
         nospikes, savgol_length=0.019, savgol_polyord=2,
         dilate_nan=0, **common_args)
     events = detect(p, 50.0, **common_args)
-    ut.show_gaze(data, p, events)
-    print(events)
     assert events is not None
     # we find at least the saccade
-    assert len(events) > 1
-    assert events['label'][0] == 'SACCADE'
-    # last one is always a fixation
-    assert events['label'][-1] == 'FIX'
-    if len(events) > 2:
-        assert events['label'][1] == 'GLISSADE'
-        # a glissade start equals the end of the preceding saccade
-        assert events['start_time'][1] == events['end_time'][0]
+    assert len(events) == 4
+    assert list(events['label']) == ['FIX', 'SACCADE', 'GLISSADE', 'FIX']
+    for i in range(0, len(events) - 1):
+        # complete segmentation
+        assert events['start_time'][i + 1] == events['end_time'][i]

@@ -164,7 +164,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
             sacc_duration = sacc_end - sacc_start
             events.append((
                 "SACCADE",
-                # TODO should yield times not idx
                 sacc_start / sampling_rate,
                 sacc_end / sampling_rate,
                 sacc_data[0]['x'],
@@ -196,7 +195,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 gl_duration = gliss_end - (sacc_end + 1)
                 events.append((
                     "GLISSADE",
-                    # TODO should yield times not idx
                     sacc_end / sampling_rate,
                     gliss_end / sampling_rate,
                     gldata[0]['x'],
@@ -212,7 +210,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0):
                 break
 
 ######### fixation detection after everything else is identified ########
-    # TODO: generalize -- everything prior the first saccade could be a fixation
     # currently completely ignored
     if not fix:
         # we got nothing whatsoever, the whole thing is a fixation

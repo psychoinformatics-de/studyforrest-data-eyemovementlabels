@@ -30,12 +30,12 @@ def mk_gaze_sample(
         fix_std=5,
         sacc=20,
         sacc_dist=200,
-        glis=30,
-        glis_dist=-40,
+        pso=30,
+        pso_dist=-40,
         start_x=0.0,
         noise_std=2,
         ):
-    duration = pre_fix + sacc + glis + post_fix
+    duration = pre_fix + sacc + pso + post_fix
     samp = np.empty(duration)
     # pre_fix
     t = 0
@@ -46,10 +46,10 @@ def mk_gaze_sample(
     samp[t:t + sacc] = get_drift(sacc, pos, sacc_dist)
     t += sacc
     pos += sacc_dist
-    # glissade
-    samp[t:t + glis] = get_drift(glis, pos, glis_dist)
-    t += glis
-    pos += glis_dist
+    # pso
+    samp[t:t + pso] = get_drift(pso, pos, pso_dist)
+    t += pso
+    pos += pso_dist
     # post fixation
     samp[t:t + post_fix] = get_noise(post_fix, pos, fix_std)
     samp += get_noise(len(samp), 0, noise_std)
@@ -79,7 +79,8 @@ def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
     colors = {
         'FIX': 'gray',
         'SAC': 'green',
-        'PSO': 'yellow',
+        'HVPSO': 'yellow',
+        'LVPSO': 'orange',
     }
 
     import pylab as pl
@@ -93,6 +94,10 @@ def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['x'],
             color='orange')
+        pl.plot(
+            np.linspace(0, len(pp) / sampling_rate, len(pp)),
+            pp['vel'],
+            color='gray')
     if events is not None:
         for ev in events:
             pl.axvspan(

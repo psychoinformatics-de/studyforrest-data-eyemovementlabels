@@ -42,7 +42,6 @@ def test_one_saccade():
         dilate_nan=0, **common_args)
     events = detect(p, 50.0, **common_args)
     assert events is not None
-    #ut.show_gaze(data, p, events)
     # we find at least the saccade
     assert len(events) > 2
     if len(events) == 4:
@@ -52,3 +51,22 @@ def test_one_saccade():
         for i in range(0, len(events) - 1):
             # complete segmentation
             assert events['start_time'][i + 1] == events['end_time'][i]
+
+
+def test_too_long_pso():
+    samp = ut.mk_gaze_sample(
+        pre_fix=1000,
+        post_fix=1000,
+        sacc=20,
+        sacc_dist=200,
+        pso=120,
+        pso_dist=160)
+    data = ut.expand_samp(samp, y=0.0)
+    nospikes = pp.filter_spikes(data.copy())
+    p = pp.preproc(
+        nospikes, savgol_length=0.019, savgol_polyord=2,
+        dilate_nan=0, **common_args)
+    events = detect(p, 50.0, **common_args)
+    assert events[2]['label'] == 'LVPSO'
+    # TODO ATM it cannot detect that, figure out whether it should
+    assert events[2]['duration'] > 80

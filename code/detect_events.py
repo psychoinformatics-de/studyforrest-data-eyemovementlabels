@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: iso-8859-15 -*-
 import numpy as np
-from scipy import ndimage
+from statsmodels.robust.scale import mad
 import sys
 import gzip
 
@@ -38,7 +38,6 @@ def get_adaptive_saccade_velocity_velthresh(vels, start=300.0):
       (and lower) value can be used to determine a more precise saccade onset.
     """
     cur_thresh = start
-    from statsmodels.robust.scale import mad
 
     def _get_thresh(cut):
         # helper function
@@ -101,7 +100,7 @@ def get_saccade_end_velthresh(vels, start_idx, width, sac_onset_velthresh):
     # saccade have some data to compute a velocity stdev from
     off_velthresh = \
         (0.7 * sac_onset_velthresh) + \
-        (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
+        (0.3 * (np.median(off_period_vel) + 3 * mad(off_period_vel))) \
         if len(off_period_vel) > width else sac_onset_velthresh
     return off_velthresh
 
@@ -164,6 +163,7 @@ def detect(data,
         velocities,
         sac_peak_velthresh)
 
+    cursor = 0
     for i, pos in enumerate(saccade_locs):
         sacc_start, sacc_end = pos
         if fix and sacc_end < fix[-1]:
@@ -179,7 +179,8 @@ def detect(data,
         sacc_start = find_saccade_onsetidx(
             velocities, sacc_start, sac_onset_velthresh)
 
-        if velocities[max(0, sacc_start - minimum_fixation_duration):sacc_start].mean() \
+        if np.median(
+                velocities[max(0, sacc_start - minimum_fixation_duration):sacc_start]) \
                 > sac_peak_velthresh:
             # not period of relative stillness prior this peak, ignore
             lgr.debug(
@@ -203,10 +204,11 @@ def detect(data,
             velocities, sacc_end, off_velthresh)
 
         sacc_amp = None
-        if sacc_end - sacc_start < minimum_saccade_duration or \
+        if sacc_start - cursor < minimum_fixation_duration or \
+                sacc_end - sacc_start < minimum_saccade_duration or \
                 np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
-            # too short or blinks
-            # second test should be redundant, but we leave it, because the cost
+            # too soon after a previous saccade, too short, or blinks
+            # last test should be redundant, but we leave it, because the cost
             # is low
             continue
 
@@ -238,6 +240,7 @@ def detect(data,
             avVel,
             sacc_duration))
         sacc_amp = amp
+        cursor = sacc_end
 
         pso_label = None
         pso_end = None

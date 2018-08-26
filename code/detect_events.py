@@ -18,8 +18,8 @@ def get_signal_props(data, px2deg):
     return pv, amp, avVel
 
 
-def get_adaptive_saccade_velocity_threshold(data, start=300.0):
-    """Determine saccade velocity threshold.
+def get_adaptive_saccade_velocity_velthresh(data, start=300.0):
+    """Determine saccade peak velocity threshold.
 
     Takes global noise-level of data into account. Implementation
     based on algorithm proposed by NYSTROM and HOLMQVIST (2010).
@@ -34,7 +34,7 @@ def get_adaptive_saccade_velocity_threshold(data, start=300.0):
     Returns
     -------
     tuple
-      (saccade velocity threshold, soft velocity threshold). The latter
+      (peak saccade velocity threshold, saccade onset velocity threshold). The latter
       (and lower) value can be used to determine a more precise saccade onset.
     """
     cur_thresh = start
@@ -71,10 +71,9 @@ def find_saccades(vels, threshold):
 
     Returns
     -------
-    locs
-      `loc` is a list of indices of the `vels` array where the saccade
-      velocity threshold has been exceeded and the previous sample was still
-      below the threshold.
+    list
+      Each item is a tuple with start and end index of the window where velocities
+      exceed the threshold.
     """
     sacs = []
     sac_on = None
@@ -90,27 +89,27 @@ def find_saccades(vels, threshold):
         sacs.append((sac_on, len(vels) - 1))
 
     if not len(sacs):
-        lgr.warn('Got no above saccade threshold velocity values')
+        lgr.warn('Got no above saccade peak threshold velocity values')
     return sacs
 
 
-def get_saccade_end_velocity_threshold(vels, start_idx, width, soft_threshold):
+def get_saccade_end_velthresh(vels, start_idx, width, sac_onset_velthresh):
     off_period_vel = vels[max(0, start_idx - width - 1):start_idx]
     # exclude NaN
     off_period_vel = off_period_vel[~np.isnan(off_period_vel)]
     # go with adaptive threshold, but only if the window prior to the
     # saccade have some data to compute a velocity stdev from
-    off_threshold = \
-        (0.7 * soft_threshold) + \
+    off_velthresh = \
+        (0.7 * sac_onset_velthresh) + \
         (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
-        if len(off_period_vel) > 40 else soft_threshold
-    return off_threshold
+        if len(off_period_vel) > 40 else sac_onset_velthresh
+    return off_velthresh
 
 
-def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
+def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
            sort_events=True):
     # find velocity thresholds for saccade detection
-    threshold, soft_threshold = get_adaptive_saccade_velocity_threshold(data)
+    sac_peak_velthresh, sac_onset_velthresh = get_adaptive_saccade_velocity_velthresh(data)
 
     events = []
     saccade_locs = []
@@ -120,14 +119,14 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
 
     saccade_locs = find_saccades(
         velocities,
-        threshold)
+        sac_peak_velthresh)
 
     for i, pos in enumerate(saccade_locs):
         sacc_start, sacc_end = pos
-        lgr.debug('Investigation above saccade threshold velocity window [%i, %i]',
+        lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
         while sacc_start > 0 \
-                and (velocities[sacc_start] > soft_threshold):
+                and (velocities[sacc_start] > sac_onset_velthresh):
             # we used to do this, but it could mean detecting very long
             # saccades that consist of (mostly) missing data
             #         or np.isnan(velocities[sacc_start])):
@@ -143,16 +142,16 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
 
         # determine velocity threshold for the saccade end, based on
         # velocity stdev immediately prior the saccade start
-        off_threshold = get_saccade_end_velocity_threshold(
+        off_velthresh = get_saccade_end_velthresh(
             velocities,
             sacc_start,
             40,
-            soft_threshold)
+            sac_onset_velthresh)
 
         # shift saccade end index to the first element that is below the
         # velocity threshold
         while sacc_end < len(data) - 1 > 0 and \
-                velocities[sacc_end] > off_threshold:
+                velocities[sacc_end] > off_velthresh:
                 # we used to do this, but it could mean detecting very long
                 # saccades that consist of (mostly) missing data
                 #    or np.isnan(velocities[sacc_end])):
@@ -185,10 +184,10 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
         gldata = data[sacc_end:sacc_end + 40]
         # going from the end of the window to find the last match
         for i in range(0, len(gldata) - 2):
-            # velocity after saccade end goes below the soft threshold
+            # velocity after saccade end goes below the saccade onset threshold
             # and immediately afterwards stay or increases the velocity again
-            if gldata[(-1 * i) - 2]['vel'] < soft_threshold and \
-                    gldata[(-1 * i) - 1]['vel'] > soft_threshold and \
+            if gldata[(-1 * i) - 2]['vel'] < sac_onset_velthresh and \
+                    gldata[(-1 * i) - 1]['vel'] > sac_onset_velthresh and \
                     gldata[(-1 * i) -3]['vel'] >= gldata[(-1 * i) -2]['vel']:
                 gliss_data = gldata[:-i]
                 gliss_end = sacc_end + len(gldata) - i
@@ -245,7 +244,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
             fix_duration = fix_end - fix_start
 
             # TODO if there is too much data loss, split fixation in multiple parts
-            if avVel < fixation_threshold and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
+            if avVel < fixation_velthresh and amp < 2 and np.sum(np.isnan(fixdata['vel'])) <= 10:
                 events.append((
                     "FIX",
                     fix_start / sampling_rate,
@@ -274,7 +273,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
 
 
 if __name__ == '__main__':
-    fixation_threshold = float(sys.argv[1])
+    fixation_velthresh = float(sys.argv[1])
     px2deg = float(sys.argv[2])
     infpath = sys.argv[3]
     outfpath = sys.argv[4]
@@ -283,7 +282,7 @@ if __name__ == '__main__':
         delimiter='\t',
         names=['vel', 'accel', 'x', 'y'])
 
-    events = detect(data, outfpath, fixation_threshold, px2deg)
+    events = detect(data, outfpath, fixation_velthresh, px2deg)
 
     # TODO think about just saving it in binary form
     f = gzip.open(outfpath, "w")

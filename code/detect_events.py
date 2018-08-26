@@ -102,14 +102,22 @@ def get_saccade_end_velthresh(vels, start_idx, width, sac_onset_velthresh):
     off_velthresh = \
         (0.7 * sac_onset_velthresh) + \
         (0.3 * (np.mean(off_period_vel) + 3 * np.std(off_period_vel))) \
-        if len(off_period_vel) > 40 else sac_onset_velthresh
+        if len(off_period_vel) > width else sac_onset_velthresh
     return off_velthresh
 
 
-def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
+def detect(data,
+           fixation_velthresh,
+           px2deg,
+           minimum_fixation_duration=0.04,
+           sampling_rate=1000.0,
            sort_events=True):
     # find velocity thresholds for saccade detection
-    sac_peak_velthresh, sac_onset_velthresh = get_adaptive_saccade_velocity_velthresh(data)
+    sac_peak_velthresh, sac_onset_velthresh = \
+        get_adaptive_saccade_velocity_velthresh(data)
+
+    # comvert to #samples
+    minimum_fixation_duration = int(minimum_fixation_duration * sampling_rate)
 
     events = []
     saccade_locs = []
@@ -126,7 +134,11 @@ def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
         lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
         while sacc_start > 0 \
-                and (velocities[sacc_start] > sac_onset_velthresh):
+                and (velocities[sacc_start] > sac_onset_velthresh) \
+                and (velocities[sacc_start] <= velocities[sacc_start - 1]):
+            # find first local minimum after vel drops below onset threshold
+            # going backwards in time
+
             # we used to do this, but it could mean detecting very long
             # saccades that consist of (mostly) missing data
             #         or np.isnan(velocities[sacc_start])):
@@ -138,15 +150,17 @@ def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
             fix.append(0)
         # this is sophisticated for saying "I am not a fixation anymore"
         fix.append(-sacc_start)
-        lgr.debug('Ending fixation candidate at %i', abs(fix[-1]))
+        lgr.debug('Fixation candidate end/saccade start at %i', abs(fix[-1]))
 
         # determine velocity threshold for the saccade end, based on
         # velocity stdev immediately prior the saccade start
         off_velthresh = get_saccade_end_velthresh(
             velocities,
             sacc_start,
-            40,
+            minimum_fixation_duration,
             sac_onset_velthresh)
+        lgr.debug('Adaptive saccade offset velocity threshold %.1f (vs onset threshold %.1f)',
+                  off_velthresh, sac_onset_velthresh)
 
         # shift saccade end index to the first element that is below the
         # velocity threshold
@@ -158,7 +172,7 @@ def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
             sacc_end += 1
         # mark start of a fixation
         fix.append(sacc_end)
-        lgr.debug('Starting fixation candidate at %i', abs(fix[-1]))
+        lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 
         # minimum duration 9 ms and no blinks allowed
         # second test should be redundant, but we leave it, because the cost
@@ -181,7 +195,7 @@ def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
                 avVel,
                 sacc_duration))
 
-        gldata = data[sacc_end:sacc_end + 40]
+        gldata = data[sacc_end:sacc_end + minimum_fixation_duration]
         # going from the end of the window to find the last match
         for i in range(0, len(gldata) - 2):
             # velocity after saccade end goes below the saccade onset threshold
@@ -234,8 +248,7 @@ def detect(data, fixation_velthresh, px2deg, sampling_rate=1000.0,
         fix_start = f
         # end times are coded negative
         fix_end = abs(fix[j + 1])
-        # TODO parameter `minimum_fixation_duration`
-        if fix_start >= 0 and fix_end - f > 40:
+        if fix_start >= 0 and fix_end - f > minimum_fixation_duration:
             fixdata = data[fix_start:fix_end]
             if not len(fixdata) or np.isnan(fixdata[0][0]):
                 lgr.error("Erroneous fixation interval")

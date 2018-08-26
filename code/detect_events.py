@@ -18,7 +18,7 @@ def get_signal_props(data, px2deg):
     return pv, amp, avVel
 
 
-def get_adaptive_saccade_velocity_velthresh(data, start=300.0):
+def get_adaptive_saccade_velocity_velthresh(vels, start=300.0):
     """Determine saccade peak velocity threshold.
 
     Takes global noise-level of data into account. Implementation
@@ -38,12 +38,15 @@ def get_adaptive_saccade_velocity_velthresh(data, start=300.0):
       (and lower) value can be used to determine a more precise saccade onset.
     """
     cur_thresh = start
+    from statsmodels.robust.scale import mad
 
     def _get_thresh(cut):
         # helper function
-        vel_uthr = data['vel'][data['vel'] < cut]
-        avg = vel_uthr.mean()
-        sd = vel_uthr.std()
+        vel_uthr = vels[vels < cut]
+        #avg = np.mean(vel_uthr)
+        avg = np.median(vel_uthr)
+        #sd = vel_uthr.std()
+        sd = mad(vel_uthr)
         return avg + 6 * sd, avg, sd
 
     # re-compute threshold until value converges
@@ -142,7 +145,7 @@ def detect(data,
            sort_events=True):
     # find velocity thresholds for saccade detection
     sac_peak_velthresh, sac_onset_velthresh = \
-        get_adaptive_saccade_velocity_velthresh(data)
+        get_adaptive_saccade_velocity_velthresh(data['vel'])
     lgr.info('Global saccade velocity thresholds: %.1f, %.1f (onset, peak)',
              sac_onset_velthresh, sac_peak_velthresh)
 

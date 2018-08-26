@@ -127,9 +127,11 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
 
         if not fix:
             # start with a fixation
+            lgr.debug('No fixation candidate start yet, appending')
             fix.append(0)
         # this is sophisticated for saying "I am not a fixation anymore"
         fix.append(-sacc_start)
+        lgr.debug('Ending fixation candidate at %i', abs(fix[-1]))
 
         # determine velocity threshold for the saccade end, based on
         # velocity stdev immediately prior the saccade start
@@ -154,6 +156,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
             sacc_end += 1
         # mark start of a fixation
         fix.append(sacc_end)
+        lgr.debug('Starting fixation candidate at %i', abs(fix[-1]))
 
         # minimum duration 9 ms and no blinks allowed
         # second test should be redundant, but we leave it, because the cost
@@ -208,6 +211,7 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
                     gl_duration))
                 fix.pop()
                 fix.append(gliss_end)
+                lgr.debug('PSO found, moved fixation candidate start to %i', abs(fix[-1]))
                 break
 
 ######### fixation detection after everything else is identified ########
@@ -215,16 +219,21 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
     if not fix:
         # we got nothing whatsoever, the whole thing is a fixation
         fix.append(0)
+        lgr.debug('No fixation candidate start yet, appending')
     if not fix[-1] < 0:
         # end of fixation it missing
         fix.append(-(len(data) - 1))
+        lgr.debug('Closing final fixation candidate at %i', abs(fix[-1]))
 
     for j, f in enumerate(fix[:-1]):
-        # TODO this should skip every other index (end times)!
+        if f < 0:
+            # fixation end time, skip
+            continue
         fix_start = f
         # end times are coded negative
         fix_end = abs(fix[j + 1])
-        if fix_start >= 0 and fix_end - f > 40:          #onset of fixation
+        # TODO parameter `minimum_fixation_duration`
+        if fix_start >= 0 and fix_end - f > 40:
             fixdata = data[fix_start:fix_end]
             if not len(fixdata) or np.isnan(fixdata[0][0]):
                 lgr.error("Erroneous fixation interval")

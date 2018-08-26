@@ -67,7 +67,7 @@ def find_saccades(vels, threshold):
     vels : array
       Velocities.
     threshold : float
-      Velocity threshold to identify the start of a saccade.
+      Velocity threshold to identify a saccade.
 
     Returns
     -------
@@ -76,16 +76,22 @@ def find_saccades(vels, threshold):
       velocity threshold has been exceeded and the previous sample was still
       below the threshold.
     """
+    sacs = []
+    sac_on = None
+    for i, v in enumerate(vels):
+        if sac_on is None  and v > threshold:
+            # start of a saccade
+            sac_on = i
+        elif sac_on and v < threshold:
+            sacs.append((sac_on, i))
+            sac_on = None
+    if sac_on:
+        # end of data, but velocities still high
+        sacs.append((sac_on, len(vels) - 1))
 
-    # saccade location is the first velocity that goes above
-    # the saccade threshold (NOT VELOCITY threshold)
-    locs = np.where(
-        np.logical_and(
-            vels[:-1] < threshold,
-            vels[1:] > threshold))[0]
-    if not len(locs):
+    if not len(sacs):
         lgr.warn('Got no above saccade threshold velocity values')
-    return locs
+    return sacs
 
 
 def get_saccade_end_velocity_threshold(vels, start_idx, width, soft_threshold):
@@ -117,7 +123,9 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
         threshold)
 
     for i, pos in enumerate(saccade_locs):
-        sacc_start = pos
+        sacc_start, sacc_end = pos
+        lgr.debug('Investigation above saccade threshold velocity window [%i, %i]',
+                  sacc_start, sacc_end)
         while sacc_start > 0 \
                 and (velocities[sacc_start] > soft_threshold):
             # we used to do this, but it could mean detecting very long
@@ -140,11 +148,6 @@ def detect(data, fixation_threshold, px2deg, sampling_rate=1000.0,
             sacc_start,
             40,
             soft_threshold)
-
-        # saccade end must be at least one sample after the start, or the
-        # decision logic below is invalid, this is OK as we are sure that the
-        # velocity threshold was exceeded
-        sacc_end = max(sacc_start + 1, pos)
 
         # shift saccade end index to the first element that is below the
         # velocity threshold

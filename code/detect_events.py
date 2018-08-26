@@ -115,6 +115,8 @@ def detect(data,
     # find velocity thresholds for saccade detection
     sac_peak_velthresh, sac_onset_velthresh = \
         get_adaptive_saccade_velocity_velthresh(data)
+    lgr.info('Global saccade velocity thresholds: %.1f, %.1f (onset, peak)',
+             sac_onset_velthresh, sac_peak_velthresh)
 
     # comvert to #samples
     minimum_fixation_duration = int(minimum_fixation_duration * sampling_rate)
@@ -134,8 +136,8 @@ def detect(data,
         lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
         while sacc_start > 0 \
-                and (velocities[sacc_start] > sac_onset_velthresh) \
-                and (velocities[sacc_start] <= velocities[sacc_start - 1]):
+                and (velocities[sacc_start] > sac_onset_velthresh or
+                     velocities[sacc_start] <= velocities[sacc_start - 1]):
             # find first local minimum after vel drops below onset threshold
             # going backwards in time
 
@@ -164,8 +166,9 @@ def detect(data,
 
         # shift saccade end index to the first element that is below the
         # velocity threshold
-        while sacc_end < len(data) - 1 > 0 and \
-                velocities[sacc_end] > off_velthresh:
+        while sacc_end < len(data) - 1 > 0 \
+                and (velocities[sacc_end] > off_velthresh or
+                     (velocities[sacc_end] > velocities[sacc_end + 1])):
                 # we used to do this, but it could mean detecting very long
                 # saccades that consist of (mostly) missing data
                 #    or np.isnan(velocities[sacc_end])):

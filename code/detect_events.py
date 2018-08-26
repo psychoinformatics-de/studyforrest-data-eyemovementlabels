@@ -152,6 +152,7 @@ def detect(data,
            fixation_velthresh,
            px2deg,
            minimum_fixation_duration=0.04,
+           minimum_saccade_duration=0.01,
            sampling_rate=1000.0,
            sort_events=True):
     # find velocity thresholds for saccade detection
@@ -162,6 +163,7 @@ def detect(data,
 
     # comvert to #samples
     minimum_fixation_duration = int(minimum_fixation_duration * sampling_rate)
+    minimum_saccade_duration = int(minimum_saccade_duration * sampling_rate)
 
     events = []
     saccade_locs = []
@@ -203,10 +205,10 @@ def detect(data,
         fix.append(sacc_end)
         lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 
-        # minimum duration 9 ms and no blinks allowed
+        # minimum duration and no blinks allowed
         # second test should be redundant, but we leave it, because the cost
         # is low
-        if sacc_end - sacc_start >= 9 and\
+        if sacc_end - sacc_start >= minimum_saccade_duration and\
                 not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
             sacc_data = data[sacc_start:sacc_end]
             pv, amp, avVel = get_signal_props(sacc_data, px2deg)

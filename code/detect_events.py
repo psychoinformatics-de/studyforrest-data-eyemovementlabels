@@ -118,20 +118,7 @@ def find_saccade_onsetidx(vels, start_idx, sac_onset_velthresh):
     return idx
 
 
-def find_saccade_offsetidx(vels, start_idx, onset_idx, sac_onset_velthresh,
-                           minimum_fixation_duration):
-    # determine velocity threshold for the saccade end, based on
-    # velocity stdev immediately prior the saccade start
-    off_velthresh = get_saccade_end_velthresh(
-        vels,
-        onset_idx,
-        minimum_fixation_duration,
-        sac_onset_velthresh)
-    lgr.debug(
-        'Adaptive saccade offset velocity threshold '
-        '%.1f (vs onset threshold %.1f)',
-        off_velthresh, sac_onset_velthresh)
-
+def find_movement_offsetidx(vels, start_idx, off_velthresh):
     idx = start_idx
     # shift saccade end index to the first element that is below the
     # velocity threshold
@@ -141,13 +128,6 @@ def find_saccade_offsetidx(vels, start_idx, onset_idx, sac_onset_velthresh,
             # we used to do this, but it could mean detecting very long
             # saccades that consist of (mostly) missing data
             #    or np.isnan(vels[idx])):
-        idx += 1
-    return idx
-
-
-def find_next_local_minimum(vals, start_idx):
-    idx = start_idx
-    while idx < len(vals) - 1 and vals[idx] > vals[idx + 1]:
         idx += 1
     return idx
 
@@ -203,6 +183,30 @@ def detect(data,
                 'Ignore saccade candidate, mean velocity prior is too high')
             continue
 
+        # determine velocity threshold for the saccade end, based on
+        # velocity stdev immediately prior the saccade start
+        off_velthresh = get_saccade_end_velthresh(
+            velocities,
+            sacc_start,
+            minimum_fixation_duration,
+            sac_onset_velthresh)
+        lgr.debug(
+            'Adaptive saccade offset velocity threshold '
+            '%.1f (vs onset threshold %.1f)',
+            off_velthresh, sac_onset_velthresh)
+
+        # move forward in time to find the saccade offset
+        sacc_end = find_movement_offsetidx(
+            velocities, sacc_end, off_velthresh)
+
+        sacc_amp = None
+        if sacc_end - sacc_start < minimum_saccade_duration or \
+                np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
+            # too short or blinks
+            # second test should be redundant, but we leave it, because the cost
+            # is low
+            continue
+
         if not fix:
             # start with a fixation
             lgr.debug('No fixation candidate start yet, appending')
@@ -211,37 +215,26 @@ def detect(data,
         fix.append(-sacc_start)
         lgr.debug('Fixation candidate end/saccade start at %i', abs(fix[-1]))
 
-        # move forward in time to find the saccade offset
-        sacc_end = find_saccade_offsetidx(
-            velocities, sacc_end, sacc_start, sac_onset_velthresh,
-            minimum_fixation_duration)
-
         # mark start of a fixation candidate
         fix.append(sacc_end)
         lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 
-        sacc_amp = None
-        # minimum duration and no blinks allowed
-        # second test should be redundant, but we leave it, because the cost
-        # is low
-        if sacc_end - sacc_start >= minimum_saccade_duration and\
-                not np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
-            sacc_data = data[sacc_start:sacc_end]
-            pv, amp, avVel = get_signal_props(sacc_data, px2deg)
-            sacc_duration = sacc_end - sacc_start
-            events.append((
-                "SAC",
-                sacc_start / sampling_rate,
-                sacc_end / sampling_rate,
-                sacc_data[0]['x'],
-                sacc_data[0]['y'],
-                sacc_data[-1]['x'],
-                sacc_data[-1]['y'],
-                amp,
-                pv,
-                avVel,
-                sacc_duration))
-            sacc_amp = amp
+        sacc_data = data[sacc_start:sacc_end]
+        pv, amp, avVel = get_signal_props(sacc_data, px2deg)
+        sacc_duration = sacc_end - sacc_start
+        events.append((
+            "SAC",
+            sacc_start / sampling_rate,
+            sacc_end / sampling_rate,
+            sacc_data[0]['x'],
+            sacc_data[0]['y'],
+            sacc_data[-1]['x'],
+            sacc_data[-1]['y'],
+            amp,
+            pv,
+            avVel,
+            sacc_duration))
+        sacc_amp = amp
 
         pso_label = None
         pso_end = None
@@ -250,18 +243,22 @@ def detect(data,
         if pso_peaks:
             pso_label = 'HVPSO'
             # find minimum after the offset of the last reported peak
-            pso_end = find_next_local_minimum(
-                velocities, sacc_end + pso_peaks[-1][-1])
+            pso_end = find_movement_offsetidx(
+                velocities, sacc_end + pso_peaks[-1][-1], off_velthresh)
         else:
             pso_peaks = find_peaks(psovelocities, sac_onset_velthresh)
             if pso_peaks:
                 pso_label = 'LVPSO'
-                pso_end = find_next_local_minimum(
-                    velocities, sacc_end + pso_peaks[-1][-1])
-        if pso_label:
+                pso_end = find_movement_offsetidx(
+                    velocities, sacc_end + pso_peaks[-1][-1],
+                    off_velthresh)
+        if pso_label and pso_end - sacc_end < maximum_pso_duration:
+            # there was a velocity spike and it is short enough to fit
+            # into the maximum window
             psodata = data[sacc_end:pso_end]
             pv, amp, avVel = get_signal_props(psodata, px2deg)
-            # ignore any PSO with an amplitude larger than the preceding saccade
+            # ignore any PSO with an amplitude larger than the preceding
+            # saccade
             if amp < sacc_amp:
                 events.append((
                     pso_label,
@@ -269,7 +266,7 @@ def detect(data,
                     pso_end / sampling_rate,
                     psodata[0]['x'],
                     psodata[0]['y'],
-                    psodata[-i]['x'],
+                    psodata[-1]['x'],
                     psodata[-1]['y'],
                     amp,
                     pv,

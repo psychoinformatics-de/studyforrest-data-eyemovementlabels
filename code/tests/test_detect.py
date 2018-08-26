@@ -59,14 +59,33 @@ def test_too_long_pso():
         post_fix=1000,
         sacc=20,
         sacc_dist=200,
-        pso=120,
-        pso_dist=160)
+        # just under 30deg/s (max smooth pursuit)
+        pso=80,
+        pso_dist=100)
     data = ut.expand_samp(samp, y=0.0)
     nospikes = pp.filter_spikes(data.copy())
     p = pp.preproc(
         nospikes, savgol_length=0.019, savgol_polyord=2,
         dilate_nan=0, **common_args)
     events = detect(p, 50.0, **common_args)
+    ut.show_gaze(data, p, events)
+    return
     assert events[2]['label'] == 'LVPSO'
     # TODO ATM it cannot detect that, figure out whether it should
     assert events[2]['duration'] > 80
+
+
+def test_real_data():
+    data = np.recfromcsv(
+        'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
+        delimiter='\t',
+        names=['x', 'y', 'pupil', 'frame'])
+    nospikes = pp.filter_spikes(data.copy())
+    p = pp.preproc(
+        nospikes, savgol_length=0.019, savgol_polyord=2,
+        dilate_nan=0,
+        px2deg=0.0185581232561,
+        sampling_rate=1000.0,
+    )
+    events = detect(p, 50.0, **common_args)
+    ut.show_gaze(data, p, events)

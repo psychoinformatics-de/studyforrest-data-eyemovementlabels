@@ -175,6 +175,12 @@ def detect(data,
 
     for i, pos in enumerate(saccade_locs):
         sacc_start, sacc_end = pos
+        if fix and sacc_end < fix[-1]:
+            lgr.debug(
+                'Skipping saccade peak velocity window [%i, %i], '
+                'inside prev. reported saccade/PSO window (ends at %i)',
+                sacc_start, sacc_end, fix[-1])
+            continue
         lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
 

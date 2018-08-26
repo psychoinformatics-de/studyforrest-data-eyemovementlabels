@@ -186,8 +186,16 @@ def detect(data,
         lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
 
+        # move backwards in time to find the saccade onset
         sacc_start = find_saccade_onsetidx(
             velocities, sacc_start, sac_onset_velthresh)
+
+        if velocities[max(0, sacc_start - minimum_fixation_duration):sacc_start].mean() \
+                > sac_peak_velthresh:
+            # not period of relative stillness prior this peak, ignore
+            lgr.debug(
+                'Ignore saccade candidate, mean velocity prior is too high')
+            continue
 
         if not fix:
             # start with a fixation
@@ -197,11 +205,12 @@ def detect(data,
         fix.append(-sacc_start)
         lgr.debug('Fixation candidate end/saccade start at %i', abs(fix[-1]))
 
+        # move forward in time to find the saccade offset
         sacc_end = find_saccade_offsetidx(
             velocities, sacc_end, sacc_start, sac_onset_velthresh,
             minimum_fixation_duration)
 
-        # mark start of a fixation
+        # mark start of a fixation candidate
         fix.append(sacc_end)
         lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 

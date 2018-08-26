@@ -59,15 +59,15 @@ def get_adaptive_saccade_velocity_velthresh(data, start=300.0):
     return cur_thresh, (avg + 3 * sd)
 
 
-def find_saccades(vels, threshold):
-    """Find time periods with saccades
+def find_peaks(vels, threshold):
+    """Find above-threshold time periods
 
     Parameters
     ----------
     vels : array
       Velocities.
     threshold : float
-      Velocity threshold to identify a saccade.
+      Velocity threshold.
 
     Returns
     -------
@@ -87,9 +87,6 @@ def find_saccades(vels, threshold):
     if sac_on:
         # end of data, but velocities still high
         sacs.append((sac_on, len(vels) - 1))
-
-    if not len(sacs):
-        lgr.warn('Got no above saccade peak threshold velocity values')
     return sacs
 
 
@@ -138,7 +135,7 @@ def find_saccade_offsetidx(vels, start_idx, onset_idx, sac_onset_velthresh,
     idx = start_idx
     # shift saccade end index to the first element that is below the
     # velocity threshold
-    while idx < len(vels) - 1 > 0 \
+    while idx < len(vels) - 1 \
             and (vels[idx] > off_velthresh or
                  (vels[idx] > vels[idx + 1])):
             # we used to do this, but it could mean detecting very long
@@ -148,11 +145,19 @@ def find_saccade_offsetidx(vels, start_idx, onset_idx, sac_onset_velthresh,
     return idx
 
 
+def find_next_local_minimum(vals, start_idx):
+    idx = start_idx
+    while idx < len(vals) - 1 and vals[idx] > vals[idx + 1]:
+        idx += 1
+    return idx
+
+
 def detect(data,
            fixation_velthresh,
            px2deg,
            minimum_fixation_duration=0.04,
            minimum_saccade_duration=0.01,
+           maximum_pso_duration=0.04,
            sampling_rate=1000.0,
            sort_events=True):
     # find velocity thresholds for saccade detection
@@ -164,6 +169,7 @@ def detect(data,
     # comvert to #samples
     minimum_fixation_duration = int(minimum_fixation_duration * sampling_rate)
     minimum_saccade_duration = int(minimum_saccade_duration * sampling_rate)
+    maximum_pso_duration = int(maximum_pso_duration * sampling_rate)
 
     events = []
     saccade_locs = []
@@ -171,7 +177,7 @@ def detect(data,
 
     velocities = data['vel']
 
-    saccade_locs = find_saccades(
+    saccade_locs = find_peaks(
         velocities,
         sac_peak_velthresh)
 
@@ -214,6 +220,7 @@ def detect(data,
         fix.append(sacc_end)
         lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 
+        sacc_amp = None
         # minimum duration and no blinks allowed
         # second test should be redundant, but we leave it, because the cost
         # is low
@@ -234,41 +241,44 @@ def detect(data,
                 pv,
                 avVel,
                 sacc_duration))
+            sacc_amp = amp
 
-        gldata = data[sacc_end:sacc_end + minimum_fixation_duration]
-        # going from the end of the window to find the last match
-        for i in range(0, len(gldata) - 2):
-            # velocity after saccade end goes below the saccade onset threshold
-            # and immediately afterwards stay or increases the velocity again
-            if gldata[(-1 * i) - 2]['vel'] < sac_onset_velthresh and \
-                    gldata[(-1 * i) - 1]['vel'] > sac_onset_velthresh and \
-                    gldata[(-1 * i) -3]['vel'] >= gldata[(-1 * i) -2]['vel']:
-                gliss_data = gldata[:-i]
-                gliss_end = sacc_end + len(gldata) - i
-
-                if not len(gliss_data) or \
-                        np.sum(np.isnan(gliss_data['vel'])) > 10:
-                    # not more than 10 ms of signal loss in post saccadic
-                    # oscilations/glissades
-                    break
-                pv, amp, avVel = get_signal_props(gliss_data, px2deg)
-                gl_duration = gliss_end - (sacc_end + 1)
+        pso_label = None
+        pso_end = None
+        psovelocities = velocities[sacc_end:sacc_end + maximum_pso_duration]
+        pso_peaks = find_peaks(psovelocities, sac_peak_velthresh)
+        if pso_peaks:
+            pso_label = 'HVPSO'
+            # find minimum after the offset of the last reported peak
+            pso_end = find_next_local_minimum(
+                velocities, sacc_end + pso_peaks[-1][-1])
+        else:
+            pso_peaks = find_peaks(psovelocities, sac_onset_velthresh)
+            if pso_peaks:
+                pso_label = 'LVPSO'
+                pso_end = find_next_local_minimum(
+                    velocities, sacc_end + pso_peaks[-1][-1])
+        if pso_label:
+            psodata = data[sacc_end:pso_end]
+            pv, amp, avVel = get_signal_props(psodata, px2deg)
+            # ignore any PSO with an amplitude larger than the preceding saccade
+            if amp < sacc_amp:
                 events.append((
-                    "PSO",
+                    pso_label,
                     sacc_end / sampling_rate,
-                    gliss_end / sampling_rate,
-                    gldata[0]['x'],
-                    gldata[0]['y'],
-                    gldata[-i]['x'],
-                    gldata[-1]['y'],
+                    pso_end / sampling_rate,
+                    psodata[0]['x'],
+                    psodata[0]['y'],
+                    psodata[-i]['x'],
+                    psodata[-1]['y'],
                     amp,
                     pv,
                     avVel,
-                    gl_duration))
+                    pso_end - sacc_end))
                 fix.pop()
-                fix.append(gliss_end)
-                lgr.debug('PSO found, moved fixation candidate start to %i', abs(fix[-1]))
-                break
+                fix.append(pso_end)
+                lgr.debug('%s found, moved fixation candidate start to %i',
+                          pso_label, abs(fix[-1]))
 
 ######### fixation detection after everything else is identified ########
     # currently completely ignored

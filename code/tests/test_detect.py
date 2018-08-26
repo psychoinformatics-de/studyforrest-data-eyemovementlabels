@@ -47,7 +47,8 @@ def test_one_saccade():
     assert len(events) > 2
     if len(events) == 4:
         # full set
-        assert list(events['label']) == ['FIX', 'SAC', 'PSO', 'FIX']
+        assert list(events['label']) == ['FIX', 'SAC', 'LVPSO', 'FIX'] or \
+            list(events['label']) == ['FIX', 'SAC', 'HVPSO', 'FIX']
         for i in range(0, len(events) - 1):
             # complete segmentation
             assert events['start_time'][i + 1] == events['end_time'][i]

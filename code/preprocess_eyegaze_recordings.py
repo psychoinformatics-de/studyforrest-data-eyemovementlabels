@@ -4,6 +4,7 @@
 import sys
 import numpy as np
 from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing data
+from scipy.ndimage import median_filter
 from scipy import ndimage as ndimage
 import os
 import os.path as op
@@ -43,8 +44,8 @@ def filter_spikes(data):
 
 
 def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
-            savgol_length=0.019, savgol_polyord=1, sampling_rate=1000.0,
-            max_vel=1000.0):
+            median_filter_length=0.09, savgol_length=0.019, savgol_polyord=1,
+            sampling_rate=1000.0, max_vel=1000.0):
     """
     Parameters
     ----------
@@ -58,6 +59,8 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
     dilate_blink : float
       Duration by which to dilate a blink window (missing data segment) on
       either side (in seconds).
+    median_filter_width : float
+      Filter window length in seconds.
     savgol_length : float
       Filter window length in seconds.
     savgol_polyord : int
@@ -73,9 +76,12 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
     dilate_nan = int(dilate_nan * sampling_rate)
     min_blink_duration = int(min_blink_duration * sampling_rate)
     savgol_length = int(savgol_length * sampling_rate)
+    median_filter_length = int(median_filter_length * sampling_rate)
 
     # we do not want to change the original data
     data = data.copy()
+
+    data = filter_spikes(data)
 
     # for signal loss exceeding the minimum blink duration, add additional
     # dilate_nan at either end
@@ -108,6 +114,13 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
     # convert from px/sample to deg/s
     velocities *= px2deg * sampling_rate
 
+    med_velocities = np.zeros((len(data),), velocities.dtype)
+    med_velocities[1:] = (
+        np.diff(median_filter(data['x'], size=median_filter_length)) ** 2 +
+        np.diff(median_filter(data['y'], size=median_filter_length)) ** 2) ** 0.5
+    # convert from px/sample to deg/s
+    med_velocities *= px2deg * sampling_rate
+
     # replace "too fast" velocities with previous velocity
     # add missing first datapoint
     filtered_velocities = [float(0)]
@@ -128,12 +141,13 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
     acceleration[1:] = (velocities[1:] - velocities[:-1]) * sampling_rate
 
     return np.core.records.fromarrays([
+        med_velocities,
         velocities,
         acceleration,
         # TODO add time np.arange(len(filtered_velocities))
         data['x'],
         data['y']],
-        names=['vel', 'accel', 'x', 'y'])
+        names=['med_vel', 'vel', 'accel', 'x', 'y'])
 
 
 if __name__ == '__main__':

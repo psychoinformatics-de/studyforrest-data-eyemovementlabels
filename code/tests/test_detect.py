@@ -1,7 +1,7 @@
 import numpy as np
 from . import utils as ut
 from .. import preprocess_eyegaze_recordings as pp
-from ..detect_events import detect
+from .. import detect_events as d
 
 
 common_args = dict(
@@ -15,21 +15,21 @@ def test_no_saccade():
     data = ut.expand_samp(samp, y=0.0)
     p = pp.preproc(data, savgol_length=0.0, dilate_nan=0, **common_args)
     # the entire segment is labeled as a fixation
-    events = detect(p, 50.0, **common_args)
+    events = d.detect(p, 50.0, **common_args)
     assert len(events) == 1
     assert events[0]['duration'] == 1.0
     assert events[0]['label'] == 'FIX'
 
     # little missing data makes no diff
     p[500:510] = np.nan
-    events = detect(p, 50.0, **common_args)
+    events = d.detect(p, 50.0, **common_args)
     assert len(events) == 1
     assert events[0]['duration'] == 1.0
     assert events[0]['label'] == 'FIX'
 
     # but more kills it
     p[500:550] = np.nan
-    assert detect(p, 50.0, **common_args) is None
+    assert d.detect(p, 50.0, **common_args) is None
 
 
 def test_one_saccade():
@@ -40,7 +40,7 @@ def test_one_saccade():
     p = pp.preproc(
         nospikes, savgol_length=0.019, savgol_polyord=2,
         dilate_nan=0, **common_args)
-    events = detect(p, 50.0, **common_args)
+    events = d.detect(p, 50.0, **common_args)
     assert events is not None
     # we find at least the saccade
     assert len(events) > 2
@@ -67,7 +67,7 @@ def test_too_long_pso():
     p = pp.preproc(
         nospikes, savgol_length=0.019, savgol_polyord=2,
         dilate_nan=0, **common_args)
-    events = detect(p, 50.0, **common_args)
+    events = d.detect(p, 50.0, **common_args)
     ut.show_gaze(data, p, events)
     return
     assert events[2]['label'] == 'LVPSO'
@@ -80,12 +80,29 @@ def test_real_data():
         'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
         delimiter='\t',
         names=['x', 'y', 'pupil', 'frame'])
-    nospikes = pp.filter_spikes(data.copy())
+    #nospikes = pp.filter_spikes(data.copy())
+    #from scipy.ndimage import median_filter
+    #med_x = median_filter(nospikes['x'], size=100)
+    #med_y = median_filter(nospikes['y'], size=100)
+
     p = pp.preproc(
-        nospikes, savgol_length=0.019, savgol_polyord=2,
-        dilate_nan=0,
+        data, savgol_length=0.019, savgol_polyord=1,
+        dilate_nan=0.01,
         px2deg=0.0185581232561,
         sampling_rate=1000.0,
     )
-    events = detect(p, 50.0, **common_args)
-    ut.show_gaze(data, p, events)
+    #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
+    events = d.detect(p[:50000], 50.0, sampling_rate=1000.0, px2deg=0.0185581232561)
+    #events = None
+    import pylab as pl
+    #pl.plot(
+    #    np.linspace(0, 48000 / 1000.0, 48000),
+    #    med_x[:48000])
+    #pl.plot(
+    #    np.linspace(0, 48000 / 1000.0, 48000),
+    #    med_y[:48000])
+    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
+    saccades = events[events['label'] == 'SAC']
+    print('#saccades', len(saccades))
+    pl.plot(saccades['dist'], saccades['peak_vel'], '.')
+    pl.show()

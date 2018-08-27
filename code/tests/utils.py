@@ -75,7 +75,7 @@ def samp2file(data, fname):
         delimiter='\t')
 
 
-def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
+def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0):
     colors = {
         'FIX': 'gray',
         'SAC': 'green',
@@ -96,8 +96,16 @@ def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
             color='orange')
         pl.plot(
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
+            pp['y'],
+            color='orange')
+        pl.plot(
+            np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['vel'],
             color='gray')
+        pl.plot(
+            np.linspace(0, len(pp) / sampling_rate, len(pp)),
+            pp['med_vel'],
+            color='black')
     if events is not None:
         for ev in events:
             pl.axvspan(
@@ -105,4 +113,5 @@ def show_gaze(data=None, pp=None, events=None, sampling_rate=1000.0):
                 ev['end_time'],
                 color=colors[ev['label']],
                 alpha=0.3)
+            pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['dist']), color='red')
     pl.show()

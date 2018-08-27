@@ -83,7 +83,7 @@ def find_peaks(vels, threshold):
         if sac_on is None  and v > threshold:
             # start of a saccade
             sac_on = i
-        elif sac_on and v < threshold:
+        elif sac_on is not None and v < threshold:
             sacs.append((sac_on, i))
             sac_on = None
     if sac_on:
@@ -139,7 +139,10 @@ def detect(data,
            px2deg,
            minimum_fixation_duration=0.04,
            minimum_saccade_duration=0.01,
+           minimum_saccade_peak_duration=0.003,
+           minimum_saccade_distance=0.1,
            maximum_pso_duration=0.04,
+           maximum_noise_estimate_duration=0.5,
            sampling_rate=1000.0,
            sort_events=True):
     # find velocity thresholds for saccade detection
@@ -147,11 +150,17 @@ def detect(data,
         get_adaptive_saccade_velocity_velthresh(data['vel'])
     lgr.info('Global saccade velocity thresholds: %.1f, %.1f (onset, peak)',
              sac_onset_velthresh, sac_peak_velthresh)
+    sac_peak_med_velthresh, sac_onset_med_velthresh = \
+        get_adaptive_saccade_velocity_velthresh(data['med_vel'])
+    lgr.info('Global saccade MEDIAN velocity thresholds: %.1f, %.1f (onset, peak)',
+             sac_onset_med_velthresh, sac_peak_med_velthresh)
 
     # comvert to #samples
     minimum_fixation_duration = int(minimum_fixation_duration * sampling_rate)
     minimum_saccade_duration = int(minimum_saccade_duration * sampling_rate)
+    minimum_saccade_peak_duration = int(minimum_saccade_peak_duration * sampling_rate)
     maximum_pso_duration = int(maximum_pso_duration * sampling_rate)
+    maximum_noise_estimate_duration = int(maximum_noise_estimate_duration * sampling_rate)
 
     events = []
     saccade_locs = []
@@ -160,8 +169,9 @@ def detect(data,
     velocities = data['vel']
 
     saccade_locs = find_peaks(
-        velocities,
-        sac_peak_velthresh)
+        data['med_vel'],
+        #sac_peak_velthresh)
+        sac_peak_med_velthresh)
 
     cursor = 0
     for i, pos in enumerate(saccade_locs):
@@ -172,7 +182,10 @@ def detect(data,
                 'inside prev. reported saccade/PSO window (ends at %i)',
                 sacc_start, sacc_end, fix[-1])
             continue
-        lgr.debug('Investigation above saccade peak threshold velocity window [%i, %i]',
+        #if sacc_end - sacc_start < minimum_saccade_peak_duration:
+        #    lgr.debug('Saccade peak duration too short')
+        #    continue
+        lgr.debug('Investigating above saccade peak threshold velocity window [%i, %i]',
                   sacc_start, sacc_end)
 
         # move backwards in time to find the saccade onset
@@ -180,7 +193,13 @@ def detect(data,
             velocities, sacc_start, sac_onset_velthresh)
 
         if np.median(
-                velocities[max(0, sacc_start - minimum_fixation_duration):sacc_start]) \
+                velocities[
+                    max(0,
+                        min(
+                            sacc_start - cursor,
+                            maximum_noise_estimate_duration
+                        ),
+                    ):sacc_start]) \
                 > sac_peak_velthresh:
             # not period of relative stillness prior this peak, ignore
             lgr.debug(
@@ -203,13 +222,27 @@ def detect(data,
         sacc_end = find_movement_offsetidx(
             velocities, sacc_end, off_velthresh)
 
-        sacc_amp = None
-        if sacc_start - cursor < minimum_fixation_duration or \
+        sacc_data = data[sacc_start:sacc_end]
+        if np.sum(np.isnan(sacc_data['vel'])):
+            lgr.warn('NO DATA')
+            continue
+
+        pv, amp, avVel = get_signal_props(sacc_data, px2deg)
+        sacc_duration = sacc_end - sacc_start
+        if amp < minimum_saccade_distance or \
+                sacc_start - cursor < minimum_fixation_duration or \
                 sacc_end - sacc_start < minimum_saccade_duration or \
                 np.sum(np.isnan(data['x'][sacc_start:sacc_end])):
-            # too soon after a previous saccade, too short, or blinks
+            # too little distance, too soon after a previous saccade, too short, or blinks
             # last test should be redundant, but we leave it, because the cost
             # is low
+                #sacc_start - cursor < minimum_fixation_duration or \
+                #sacc_start - cursor < 1 or \
+            print('A', amp < minimum_saccade_distance, amp)
+            print('B', sacc_start - cursor < minimum_fixation_duration)
+            #print('B', sacc_start - cursor < 1)
+            print('C', sacc_end - sacc_start < minimum_saccade_duration)
+            print('D', np.sum(np.isnan(data['x'][sacc_start:sacc_end])))
             continue
 
         if not fix:
@@ -224,9 +257,6 @@ def detect(data,
         fix.append(sacc_end)
         lgr.debug('Saccade end/fixation candidate start at %i', abs(fix[-1]))
 
-        sacc_data = data[sacc_start:sacc_end]
-        pv, amp, avVel = get_signal_props(sacc_data, px2deg)
-        sacc_duration = sacc_end - sacc_start
         events.append((
             "SAC",
             sacc_start / sampling_rate,
@@ -282,6 +312,7 @@ def detect(data,
                 fix.append(pso_end)
                 lgr.debug('%s found, moved fixation candidate start to %i',
                           pso_label, abs(fix[-1]))
+                cursor = pso_end
 
 ######### fixation detection after everything else is identified ########
     # currently completely ignored

@@ -46,19 +46,19 @@ def get_adaptive_saccade_velocity_velthresh(vels, start=300.0):
         avg = np.median(vel_uthr)
         #sd = vel_uthr.std()
         sd = mad(vel_uthr)
-        return avg + 6 * sd, avg, sd
+        return avg + 10 * sd, avg, sd
 
     # re-compute threshold until value converges
     dif = 2
     while dif > 1:  # less than 1deg/s difference
         old_thresh = cur_thresh
         cur_thresh, avg, sd = _get_thresh(old_thresh)
-        lgr.info(
+        lgr.debug(
             'Saccade threshold velocity: %.1f (non-saccade mvel: %.1f, stdvel: %.1f)',
             cur_thresh, avg, sd)
         dif = abs(old_thresh - cur_thresh)
 
-    return cur_thresh, (avg + 3 * sd)
+    return cur_thresh, (avg + 5 * sd)
 
 
 def find_peaks(vels, threshold):
@@ -77,6 +77,11 @@ def find_peaks(vels, threshold):
       Each item is a tuple with start and end index of the window where velocities
       exceed the threshold.
     """
+    def _get_vels(start, end):
+        v = vels[start:end]
+        v = v[~np.isnan(v)]
+        return v
+
     sacs = []
     sac_on = None
     for i, v in enumerate(vels):
@@ -84,11 +89,11 @@ def find_peaks(vels, threshold):
             # start of a saccade
             sac_on = i
         elif sac_on is not None and v < threshold:
-            sacs.append((sac_on, i))
+            sacs.append((sac_on, i, _get_vels(sac_on, i)))
             sac_on = None
     if sac_on:
         # end of data, but velocities still high
-        sacs.append((sac_on, len(vels) - 1))
+        sacs.append((sac_on, len(vels) - 1), _get_vels(sac_on, len(vels) - 1))
     return sacs
 
 
@@ -170,7 +175,6 @@ def detect(data,
 
     saccade_locs = find_peaks(
         data['med_vel'],
-        #sac_peak_velthresh)
         sac_peak_med_velthresh)
 
     cursor = 0
@@ -367,6 +371,133 @@ def detect(data,
         return events
     else:
         return events
+
+
+def detect_primary_saccades(
+        data,
+        px2deg,
+        min_intersaccade_duration=0.1,
+        context_window_length=1.0,
+        max_saccade_freq=2.0,
+        sampling_rate=1000.0,
+        # RF away
+        sort_events=True):
+
+    sac_peak_med_velthresh, sac_onset_med_velthresh = \
+        get_adaptive_saccade_velocity_velthresh(data['med_vel'])
+    lgr.info('Global saccade MEDIAN velocity thresholds: %.1f, %.1f (onset, peak)',
+             sac_onset_med_velthresh, sac_peak_med_velthresh)
+
+    # convert to #samples
+    context_window_length = int(context_window_length * sampling_rate)
+    min_intersaccade_duration = int(
+        min_intersaccade_duration * sampling_rate)
+
+    events = []
+    saccade_events = []
+    saccade_locs = find_peaks(
+        data['med_vel'],
+        sac_peak_med_velthresh)
+
+    # status map indicating which event class any timepoint has been assigned
+    # to so far
+    status = np.zeros((len(data),), dtype=int)
+
+    # loop over all peaks sorted by the sum of their velocities
+    # i.e. longer and faster goes first
+    for i, props in enumerate(sorted(
+            saccade_locs, key=lambda x: x[2].sum(), reverse=True)):
+        sacc_start, sacc_end, peakvels = props
+        lgr.info(
+            'Process peak velocity window [%i, %i] at ~%.1f deg/s',
+            sacc_start, sacc_end, peakvels.mean())
+
+        # extract velocity data in the vicinity of the peak to calibrate
+        # threshold
+        win_start = max(
+            0,
+            sacc_start - int(context_window_length / 2))
+        win_end = min(
+            len(data),
+            sacc_end + context_window_length - (sacc_start - win_start))
+        lgr.debug('Actual context window: [%i, %i] -> %i',
+                  win_start, win_end, win_end - win_start)
+
+        context_window = data['vel']
+        sac_peak_velthresh, sac_onset_velthresh = \
+            get_adaptive_saccade_velocity_velthresh(context_window)
+
+        lgr.info('Local saccade velocity thresholds: %.1f, %.1f (onset, peak)',
+                 sac_onset_velthresh, sac_peak_velthresh)
+
+        # move backwards in time to find the saccade onset
+        sacc_start = find_saccade_onsetidx(
+            data['vel'], sacc_start, sac_onset_velthresh)
+
+        # move forward in time to find the saccade offset
+        sacc_end = find_movement_offsetidx(
+            data['vel'], sacc_end, sac_onset_velthresh)
+
+        sacc_data = data[sacc_start:sacc_end]
+        if np.sum(np.isnan(sacc_data['x'])):
+            lgr.warn('Skip saccade candidate due to missing data')
+            continue
+        elif status[sacc_start:sacc_end].sum():
+            lgr.warn('Skip saccade candidate, intersects with other event')
+            # mark as a rejected saccade
+            #status[sacc_start:sacc_end] = 11
+            continue
+        elif 1 in status[max(0, sacc_start - min_intersaccade_duration):sacc_start]:
+            # mark as a rejected saccade
+            #s = status[sacc_start:sacc_end]
+            #s[s!=1] = 11
+            lgr.warn('Skip saccade candidate, too soon after prev saccade')
+            continue
+        elif 1 in status[sacc_end:min(len(data), sacc_end + min_intersaccade_duration)]:
+            # mark as a rejected saccade
+            #status[sacc_start:sacc_end] = 11
+            lgr.warn('Skip saccade candidate, too close to following saccade')
+            continue
+
+        pv, amp, avVel = get_signal_props(sacc_data, px2deg)
+
+        event = (
+            i,
+            "SAC",
+            sacc_start / sampling_rate,
+            sacc_end / sampling_rate,
+            sacc_data[0]['x'],
+            sacc_data[0]['y'],
+            sacc_data[-1]['x'],
+            sacc_data[-1]['y']) + \
+            get_signal_props(sacc_data, px2deg)
+
+        events.append(event)
+        saccade_events.append(event)
+
+        # mark as a saccade
+        status[sacc_start:sacc_end] = 1
+
+        if len(events) / (len(data) / sampling_rate) > max_saccade_freq:
+            lgr.info('Stop initial saccade detection, max frequency reached')
+            break
+
+    field_names = ['id', 'label', 'start_time', 'end_time', 'start_x', 'start_y',
+                   'end_x', 'end_y', 'dist', 'peak_vel', 'avg_vel', 'duration']
+
+    events = np.core.records.fromrecords(
+        events,
+        names=field_names,
+    ) if events else None
+
+    if events is not None and sort_events:
+        events.sort(order='start_time')
+        return events
+    else:
+        return events
+
+
+
 
 
 if __name__ == '__main__':

@@ -113,5 +113,5 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
                 ev['end_time'],
                 color=colors[ev['label']],
                 alpha=0.3)
-            pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['dist']), color='red')
+            pl.text(ev['start_time'], 0, '{}'.format(ev['id']), color='red')
     pl.show()

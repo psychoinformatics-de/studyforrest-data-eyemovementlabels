@@ -77,7 +77,8 @@ def test_too_long_pso():
 
 def test_real_data():
     data = np.recfromcsv(
-        'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
+        'inputs/raw_eyegaze/sub-09/ses-movie/func/sub-09_ses-movie_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
+        #'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
         delimiter='\t',
         names=['x', 'y', 'pupil', 'frame'])
     #nospikes = pp.filter_spikes(data.copy())
@@ -86,13 +87,19 @@ def test_real_data():
     #med_y = median_filter(nospikes['y'], size=100)
 
     p = pp.preproc(
-        data, savgol_length=0.019, savgol_polyord=1,
+        data, savgol_length=0.019, savgol_polyord=2,
         dilate_nan=0.01,
         px2deg=0.0185581232561,
         sampling_rate=1000.0,
     )
     #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
-    events = d.detect(p[:50000], 50.0, sampling_rate=1000.0, px2deg=0.0185581232561)
+    events = d.detect_primary_saccades(
+        #p[:50000],
+        p,
+        sampling_rate=1000.0,
+        px2deg=0.0185581232561)
+    #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
+    ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
     #events = None
     import pylab as pl
     #pl.plot(
@@ -101,8 +108,8 @@ def test_real_data():
     #pl.plot(
     #    np.linspace(0, 48000 / 1000.0, 48000),
     #    med_y[:48000])
-    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
+    #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
     saccades = events[events['label'] == 'SAC']
     print('#saccades', len(saccades))
-    pl.plot(saccades['dist'], saccades['peak_vel'], '.')
+    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
     pl.show()

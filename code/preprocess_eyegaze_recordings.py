@@ -43,8 +43,22 @@ def filter_spikes(data):
     return data
 
 
+def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
+    clusters, nclusters = ndimage.label(np.isnan(arr))
+    # go through all clusters and remove any cluster that is less
+    # the max_ignore_size
+    for i in range(nclusters):
+        # cluster index is base1
+        i = i + 1
+        if (clusters == i).sum() <= max_ignore_size:
+            clusters[clusters == i] = 0
+    # mask to cover all samples with dataloss > `max_ignore_size`
+    mask = ndimage.binary_dilation(clusters > 0, iterations=iterations)
+    return mask
+
+
 def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
-            median_filter_length=0.09, savgol_length=0.019, savgol_polyord=1,
+            median_filter_length=0.05, savgol_length=0.019, savgol_polyord=1,
             sampling_rate=1000.0, max_vel=1000.0):
     """
     Parameters
@@ -87,18 +101,7 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
     # dilate_nan at either end
     # find clusters of "no data"
     if dilate_nan:
-        clusters, nclusters = ndimage.label(np.isnan(data['x']))
-        # go through all clusters and remove any cluster that is less than the minimum
-        # "blink" duration
-        for i in range(nclusters):
-            # cluster index is base1
-            i = i + 1
-            if (clusters == i).sum() <= min_blink_duration:
-                clusters[clusters == i] = 0
-        # mask to cover all samples with dataloss > `min_blink_duration`,
-        # plus `dilate_blink`
-        # samples on either side of the lost segment
-        mask = ndimage.binary_dilation(clusters > 0, iterations=dilate_nan)
+        mask = get_dilated_nan_mask(data['x'], dilate_nan, min_blink_duration)
         data['x'][mask] = np.nan
         data['y'][mask] = np.nan
         data['pupil'][mask] = np.nan
@@ -120,6 +123,8 @@ def preproc(data, px2deg, min_blink_duration=0.02, dilate_nan=0.01,
         np.diff(median_filter(data['y'], size=median_filter_length)) ** 2) ** 0.5
     # convert from px/sample to deg/s
     med_velocities *= px2deg * sampling_rate
+    # remove any velocity bordering NaN
+    med_velocities[get_dilated_nan_mask(med_velocities, dilate_nan, 0)] = np.nan
 
     # replace "too fast" velocities with previous velocity
     # add missing first datapoint

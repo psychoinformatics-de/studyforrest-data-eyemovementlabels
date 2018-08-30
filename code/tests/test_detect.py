@@ -81,30 +81,17 @@ def test_real_data():
         #'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
         delimiter='\t',
         names=['x', 'y', 'pupil', 'frame'])
-    #nospikes = pp.filter_spikes(data.copy())
-    #from scipy.ndimage import median_filter
-    #med_x = median_filter(nospikes['x'], size=100)
-    #med_y = median_filter(nospikes['y'], size=100)
 
-    p = pp.preproc(
-        data, savgol_length=0.019, savgol_polyord=2,
-        dilate_nan=0.01,
-        px2deg=0.0185581232561,
-        sampling_rate=1000.0,
-    )
     clf = d.EyegazeClassifier(
         px2deg=0.0185581232561,
         sampling_rate=1000.0)
+    p = clf.preproc(data)
 
-    #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
     events = clf(
         p[:50000],
         #p,
     )
 
-    #print("END")
-    #for e in sorted(events, key=lambda x: x['start_time']):
-    #    print(e)
     ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
     #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
     #events = None

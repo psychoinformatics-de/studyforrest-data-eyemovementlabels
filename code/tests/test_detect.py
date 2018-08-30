@@ -18,14 +18,14 @@ def test_no_saccade():
     events = d.detect(p, 50.0, **common_args)
     assert len(events) == 1
     assert events[0]['duration'] == 1.0
-    assert events[0]['label'] == 'FIX'
+    assert events[0]['label'] == 'FIXA'
 
     # little missing data makes no diff
     p[500:510] = np.nan
     events = d.detect(p, 50.0, **common_args)
     assert len(events) == 1
     assert events[0]['duration'] == 1.0
-    assert events[0]['label'] == 'FIX'
+    assert events[0]['label'] == 'FIXA'
 
     # but more kills it
     p[500:550] = np.nan
@@ -46,8 +46,8 @@ def test_one_saccade():
     assert len(events) > 2
     if len(events) == 4:
         # full set
-        assert list(events['label']) == ['FIX', 'SAC', 'LVPSO', 'FIX'] or \
-            list(events['label']) == ['FIX', 'SAC', 'HVPSO', 'FIX']
+        assert list(events['label']) == ['FIXA', 'SACC', 'LPSO', 'FIXA'] or \
+            list(events['label']) == ['FIXA', 'SACC', 'HPSO', 'FIXA']
         for i in range(0, len(events) - 1):
             # complete segmentation
             assert events['start_time'][i + 1] == events['end_time'][i]
@@ -70,7 +70,7 @@ def test_too_long_pso():
     events = d.detect(p, 50.0, **common_args)
     ut.show_gaze(data, p, events)
     return
-    assert events[2]['label'] == 'LVPSO'
+    assert events[2]['label'] == 'LPSO'
     # TODO ATM it cannot detect that, figure out whether it should
     assert events[2]['duration'] > 80
 
@@ -93,13 +93,26 @@ def test_real_data():
         sampling_rate=1000.0,
     )
     #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
-    events = d.detect_primary_saccades(
-        #p[:50000],
-        p,
+    events = d.detect_saccades(
+        p[:50000],
+        #p,
         sampling_rate=1000.0,
         px2deg=0.0185581232561)
-    #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
+
+    isp_events = d.classify_intersaccade_periods(
+        p[:50000],
+        #p,
+        events,
+        px2deg=0.0185581232561,
+        sampling_rate=1000.0)
+
+    if isp_events is not None and len(isp_events):
+        events.extend(isp_events)
+
+    #for e in sorted(events, key=lambda x: x['start_time']):
+    #    print(e)
+    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
+    #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
     #events = None
     import pylab as pl
     #pl.plot(
@@ -109,7 +122,11 @@ def test_real_data():
     #    np.linspace(0, 48000 / 1000.0, 48000),
     #    med_y[:48000])
     #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    saccades = events[events['label'] == 'SAC']
-    print('#saccades', len(saccades))
-    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
-    pl.show()
+    #import pandas as pd
+    #events = pd.DataFrame(events)
+    #saccades = events[events['label'] == 'SACC']
+    #isaccades = events[events['label'] == 'ISAC']
+    #print('#saccades', len(saccades), len(isaccades))
+    #pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
+    #pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
+    #pl.show()

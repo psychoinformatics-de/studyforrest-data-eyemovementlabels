@@ -77,10 +77,13 @@ def samp2file(data, fname):
 
 def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0):
     colors = {
-        'FIX': 'gray',
-        'SAC': 'green',
-        'HVPSO': 'yellow',
-        'LVPSO': 'orange',
+        'FIXA': 'gray',
+        'SACC': 'green',
+        'ISAC': 'pink',
+        'HPSO': 'yellow',
+        'IHPS': 'orange',
+        'LPSO': 'cyan',
+        'ILPS': 'blue',
     }
 
     import pylab as pl

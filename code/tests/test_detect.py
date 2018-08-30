@@ -92,22 +92,15 @@ def test_real_data():
         px2deg=0.0185581232561,
         sampling_rate=1000.0,
     )
-    #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
-    events = d.detect_saccades(
-        p[:50000],
-        #p,
-        sampling_rate=1000.0,
-        px2deg=0.0185581232561)
-
-    isp_events = d.classify_intersaccade_periods(
-        p[:50000],
-        #p,
-        events,
+    clf = d.EyegazeClassifier(
         px2deg=0.0185581232561,
         sampling_rate=1000.0)
 
-    if isp_events is not None and len(isp_events):
-        events.extend(isp_events)
+    #print(d.get_adaptive_saccade_velocity_velthresh(p, 100))
+    events = clf(
+        p[:50000],
+        #p,
+    )
 
     #print("END")
     #for e in sorted(events, key=lambda x: x['start_time']):

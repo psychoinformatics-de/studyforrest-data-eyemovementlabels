@@ -9,68 +9,6 @@ import gzip
 import logging
 lgr = logging.getLogger('studyforrest.detect_eyegaze_events')
 
-record_field_names = [
-    'id', 'label',
-    'start_time', 'end_time',
-    'start_x', 'start_y',
-    'end_x', 'end_y',
-    'amp', 'peak_vel', 'avg_vel',
-]
-
-
-def get_signal_props(data, px2deg):
-    data = data[~np.isnan(data['vel'])]
-    pv = data['vel'].max()
-    amp = (((data[0]['x'] - data[-1]['x']) ** 2 + \
-            (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * px2deg
-    avVel = data['vel'].mean()
-    return amp, pv, avVel
-
-
-def get_adaptive_saccade_velocity_velthresh(vels, start=300.0):
-    """Determine saccade peak velocity threshold.
-
-    Takes global noise-level of data into account. Implementation
-    based on algorithm proposed by NYSTROM and HOLMQVIST (2010).
-
-    Parameters
-    ----------
-    start : float
-      Start velocity for adaptation algorithm. Should be larger than
-      any conceivable minimal saccade velocity (in deg/s).
-    TODO std unit multipliers
-
-    Returns
-    -------
-    tuple
-      (peak saccade velocity threshold, saccade onset velocity threshold). The latter
-      (and lower) value can be used to determine a more precise saccade onset.
-    """
-    cur_thresh = start
-
-    def _get_thresh(cut):
-        # helper function
-        vel_uthr = vels[vels < cut]
-        #avg = np.mean(vel_uthr)
-        avg = np.median(vel_uthr)
-        #sd = vel_uthr.std()
-        sd = mad(vel_uthr)
-        return avg + 10 * sd, avg, sd
-
-    # re-compute threshold until value converges
-    count = 0
-    dif = 2
-    while dif > 1 and count < 30:  # less than 1deg/s difference
-        old_thresh = cur_thresh
-        cur_thresh, avg, sd = _get_thresh(old_thresh)
-        lgr.debug(
-            'Saccade threshold velocity: %.1f (non-saccade mvel: %.1f, stdvel: %.1f)',
-            cur_thresh, avg, sd)
-        dif = abs(old_thresh - cur_thresh)
-        count += 1
-
-    return cur_thresh, (avg + 5 * sd)
-
 
 def find_peaks(vels, threshold):
     """Find above-threshold time periods
@@ -85,8 +23,8 @@ def find_peaks(vels, threshold):
     Returns
     -------
     list
-      Each item is a tuple with start and end index of the window where velocities
-      exceed the threshold.
+      Each item is a tuple with start and end index of the window where
+      velocities exceed the threshold.
     """
     def _get_vels(start, end):
         v = vels[start:end]
@@ -137,20 +75,7 @@ def find_movement_offsetidx(vels, start_idx, off_velthresh):
     return idx
 
 
-def mk_event_record(data, idx, label, start, end, px2deg):
-    return dict(zip(record_field_names, (
-        idx,
-        label,
-        start,
-        end,
-        data[start]['x'],
-        data[start]['y'],
-        data[end - 1]['x'],
-        data[end - 1]['y']) + \
-        get_signal_props(data[start:end], px2deg)))
-
-
-def detect_pso(velocities, sac_velthresh, sac_peak_velthresh):
+def find_psoend(velocities, sac_velthresh, sac_peak_velthresh):
         pso_peaks = find_peaks(velocities, sac_peak_velthresh)
         if pso_peaks:
             pso_label = 'HPSO'
@@ -173,446 +98,461 @@ def detect_pso(velocities, sac_velthresh, sac_peak_velthresh):
         return pso_label, pso_end
 
 
-def detect_saccades(
-        data,
-        px2deg,
-        min_intersaccade_duration=0.1,
-        context_window_length=1.0,
-        min_saccade_duration=0.01,
-        max_saccade_freq=2.0,
-        max_pso_duration=0.04,
-        sampling_rate=1000.0,
-        sort_events=True):
+class EyegazeClassifier(object):
 
-    # convert to #samples
-    context_window_length = int(context_window_length * sampling_rate)
-    min_intersaccade_duration = int(
-        min_intersaccade_duration * sampling_rate)
-    max_pso_duration = int(max_pso_duration * sampling_rate)
-    min_saccade_duration = int(min_saccade_duration * sampling_rate)
-    max_saccade_freq = max_saccade_freq / sampling_rate
+    record_field_names = [
+        'id', 'label',
+        'start_time', 'end_time',
+        'start_x', 'start_y',
+        'end_x', 'end_y',
+        'amp', 'peak_vel', 'avg_vel',
+    ]
 
-    # find threshold velocities
-    sac_peak_med_velthresh, sac_onset_med_velthresh = \
-        get_adaptive_saccade_velocity_velthresh(data['med_vel'])
-    lgr.info('Global saccade MEDIAN velocity thresholds: %.1f, %.1f (onset, peak)',
-             sac_onset_med_velthresh, sac_peak_med_velthresh)
+    def __init__(self,
+                 px2deg,
+                 sampling_rate,
+                 velthresh_startvelocity=300.0,
+                 min_intersaccade_duration=0.1,
+                 min_saccade_duration=0.01,
+                 max_initial_saccade_freq=2.0,
+                 saccade_context_window_length=1.0,
+                 max_pso_duration=0.04,
+                 min_fixation_duration=0.04,
+                 max_fixation_amp=0.7):
+            self.px2deg = px2deg
+            self.sr = sr = sampling_rate
+            self.velthresh_startvel = velthresh_startvelocity
+            self.max_fix_amp = max_fixation_amp
 
-    saccade_locs = find_peaks(
-        data['med_vel'],
-        sac_peak_med_velthresh)
+            # convert to #samples
+            self.min_intersac_dur = int(
+                min_intersaccade_duration * sr)
+            self.min_sac_dur = int(
+                min_saccade_duration * sr)
+            self.sac_context_winlen = int(
+                saccade_context_window_length * sr)
+            self.max_pso_dur = int(
+                max_pso_duration * sr)
+            self.min_fix_dur = int(
+                min_fixation_duration * sr)
 
-    events = []
-    for e in _detect_saccades(
-            saccade_locs,
-            data,
-            0,
-            len(data),
-            px2deg=px2deg,
-            min_intersaccade_duration=min_intersaccade_duration,
-            context=context_window_length,
-            min_saccade_duration=min_saccade_duration,
-            max_saccade_freq=max_saccade_freq,
-            max_pso_duration=max_pso_duration):
-        # make timing info absolute times, not samples
-        for i in ('start_time', 'end_time'):
-            # implicit cast to float
-            e[i] = e[i] / sampling_rate
-        events.append(e)
+            self.max_sac_freq = max_initial_saccade_freq / sr
 
-    if events and sort_events:
-        return sorted(events, key=lambda x: x['start_time'])
-    else:
-        return events
+    # TODO dissolve
+    def _get_signal_props(self, data):
+        data = data[~np.isnan(data['vel'])]
+        pv = data['vel'].max()
+        amp = (((data[0]['x'] - data[-1]['x']) ** 2 + \
+                (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * self.px2deg
+        medvel = np.median(data['vel'])
+        return amp, pv, medvel
 
+    def get_adaptive_saccade_velocity_velthresh(self, vels):
+        """Determine saccade peak velocity threshold.
 
-def _detect_saccades(
-        candidate_locs,
-        data,
-        start,
-        end,
-        px2deg,
-        min_intersaccade_duration,
-        context,
-        min_saccade_duration,
-        max_saccade_freq,
-        max_pso_duration):
+        Takes global noise-level of data into account. Implementation
+        based on algorithm proposed by NYSTROM and HOLMQVIST (2010).
 
-    saccade_events = []
+        Parameters
+        ----------
+        start : float
+          Start velocity for adaptation algorithm. Should be larger than
+          any conceivable minimal saccade velocity (in deg/s).
+        TODO std unit multipliers
 
-    if context is None:
-        # no context size was given, use all data
-        # to determine velocity thresholds
-        lgr.debug(
-            'Determine velocity thresholds on full segment '
-            '[%i, %i]', start, end)
-        sac_peak_velthresh, sac_onset_velthresh = \
-            get_adaptive_saccade_velocity_velthresh(
-                data['vel'][start:end])
-        if candidate_locs is None:
+        Returns
+        -------
+        tuple
+          (peak saccade velocity threshold, saccade onset velocity threshold).
+          The latter (and lower) value can be used to determine a more precise
+          saccade onset.
+        """
+        cur_thresh = self.velthresh_startvel
+
+        def _get_thresh(cut):
+            # helper function
+            vel_uthr = vels[vels < cut]
+            med = np.median(vel_uthr)
+            scale = mad(vel_uthr)
+            return med + 10 * scale, med, scale
+
+        # re-compute threshold until value converges
+        count = 0
+        dif = 2
+        while dif > 1 and count < 30:  # less than 1deg/s difference
+            old_thresh = cur_thresh
+            cur_thresh, med, scale = _get_thresh(old_thresh)
             lgr.debug(
-                'Find velocity peaks on full segment '
-                '[%i, %i]', start, end)
-            candidate_locs = [
-                (e[0] + start, e[1] + start, e[2]) for e in find_peaks(
-                    data['vel'][start:end],
-                    sac_peak_velthresh)]
+                'Saccade threshold velocity: %.1f '
+                '(non-saccade mvel: %.1f, stdvel: %.1f)',
+                cur_thresh, med, scale)
+            dif = abs(old_thresh - cur_thresh)
+            count += 1
 
-    # status map indicating which event class any timepoint has been assigned
-    # to so far
-    status = np.zeros((len(data),), dtype=int)
+        return cur_thresh, (med + 5 * scale)
 
-    # loop over all peaks sorted by the sum of their velocities
-    # i.e. longer and faster goes first
-    for i, props in enumerate(sorted(
-            candidate_locs, key=lambda x: x[2].sum(), reverse=True)):
-        sacc_start, sacc_end, peakvels = props
-        lgr.info(
-            'Process peak velocity window [%i, %i] at ~%.1f deg/s',
-            sacc_start, sacc_end, peakvels.mean())
-
-        if context:
-            # extract velocity data in the vicinity of the peak to calibrate
-            # threshold
-            win_start = max(
-                start,
-                sacc_start - int(context / 2))
-            win_end = min(
-                end,
-                sacc_end + context - (sacc_start - win_start))
-            lgr.debug(
-                'Determine velocity thresholds in context window '
-                '[%i, %i]', win_start, win_end)
-            lgr.debug('Actual context window: [%i, %i] -> %i',
-                      win_start, win_end, win_end - win_start)
-
-            sac_peak_velthresh, sac_onset_velthresh = \
-                get_adaptive_saccade_velocity_velthresh(
-                    data['vel'][win_start:win_end])
-
-        lgr.info('Active saccade velocity thresholds: %.1f, %.1f (onset, peak)',
-                 sac_onset_velthresh, sac_peak_velthresh)
-
-        # move backwards in time to find the saccade onset
-        sacc_start = find_saccade_onsetidx(
-            data['vel'], sacc_start, sac_onset_velthresh)
-
-        # move forward in time to find the saccade offset
-        sacc_end = find_movement_offsetidx(
-            data['vel'], sacc_end, sac_onset_velthresh)
-
-        sacc_data = data[sacc_start:sacc_end]
-        if sacc_end - sacc_start < min_saccade_duration:
-            lgr.debug('Skip saccade candidate, too short')
-            continue
-        elif np.sum(np.isnan(sacc_data['x'])):
-            lgr.debug('Skip saccade candidate, missing data')
-            continue
-        elif status[max(0, sacc_start - min_intersaccade_duration):min(len(data), sacc_end + min_intersaccade_duration)].sum():
-            lgr.debug('Skip saccade candidate, too close to another event')
-            continue
-
-        lgr.debug('Found SACCADE [%i, %i]',
-                  sacc_start, sacc_end)
-        event = mk_event_record(
-            data, i, "SACC", sacc_start, sacc_end, px2deg)
-
-        if event['end_time'] > 4 and event['end_time'] < 5:
-            raise
-        yield event
-        saccade_events.append(event)
-
-        # mark as a saccade
-        status[sacc_start:sacc_end] = 1
-
-        pso = detect_pso(
-            data['vel'][sacc_end:sacc_end + max_pso_duration],
-            sac_onset_velthresh,
-            sac_peak_velthresh)
-        if pso:
-            pso_label, pso_end = pso
-            lgr.debug('Found %s [%i, %i]',
-                      pso_label, sacc_end, pso_end)
-            psoevent = mk_event_record(
-                data, i, pso_label, sacc_end, sacc_end + pso_end, px2deg)
-            yield psoevent
-            # mark as a saccade part
-            status[sacc_end:sacc_end + pso_end] = 1
-
-        if max_saccade_freq and \
-                float(len(saccade_events)) / len(data) > max_saccade_freq:
-            lgr.info('Stop initial saccade detection, max frequency reached')
-            break
-
-
-def classify_intersaccade_periods(
-        data,
-        saccade_events,
-        px2deg,
-        min_intersaccade_duration=0.1,
-        min_saccade_duration=0.01,
-        max_pso_duration=0.04,
-        sampling_rate=1000.0,
-        sort_events=True):
-
-    lgr.error('=========\n========\n=========')
-    min_intersaccade_duration = int(
-        min_intersaccade_duration * sampling_rate)
-    max_pso_duration = int(max_pso_duration * sampling_rate)
-    min_saccade_duration = int(min_saccade_duration * sampling_rate)
-
-    lgr.info('Start ISP classification')
-
-    # we need timing in samples for internal processing
-    saccade_events = [
-        dict(
-            label=e['label'],
-            start_time=int(e['start_time'] * sampling_rate),
-            end_time=int(e['end_time'] * sampling_rate)
-        ) for e in saccade_events]
-
-    events = []
-    for e in _classify_intersaccade_periods(
-            data,
-            0,
-            len(data),
-            saccade_events,
-            px2deg,
-            min_intersaccade_duration,
-            min_saccade_duration,
-            max_pso_duration,
-            saccade_detection=True):
-        # make timing info absolute times, not samples
-        for i in ('start_time', 'end_time'):
-            e[i] = e[i] / sampling_rate
-        events.append(e)
-
-    if events and sort_events:
-        return sorted(events, key=lambda x: x['start_time'])
-    else:
-        return events
-
-
-def _classify_intersaccade_periods(
-        data,
-        start,
-        end,
-        saccade_events,
-        px2deg,
-        min_intersaccade_duration,
-        min_saccade_duration,
-        max_pso_duration,
-        saccade_detection):
-
-    lgr.warn('Determine ISPs %i, %i <- %i', start, end, len(saccade_events))
-
-    prev_sacc = None
-    prev_pso = None
-    for ev in saccade_events:
-        if prev_sacc is None:
-            if 'SAC' not in ev['label']:
-                continue
-        elif prev_pso is None and 'PS' in ev['label']:
-            prev_pso = ev
-            continue
-        elif 'SAC' not in ev['label']:
-            continue
-
-        # at this point we have a previous saccade (and possibly its PSO)
-        # on record, and we have just found the next saccade
-        # -> inter-saccade window is determined
-        if prev_sacc is None:
-            #TODO should be start?
-            win_start = start
-        else:
-            if prev_pso is not None:
-                win_start = prev_pso['end_time']
-            else:
-                win_start = prev_sacc['end_time']
-        # enforce dtype for indexing
-        win_end = ev['start_time']
-        if win_start == win_end:
-            prev_sacc = ev
-            prev_pso = None
-            continue
-
-        for e in classify_intersaccade_period(
-                data,
-                win_start,
-                win_end,
-                px2deg=px2deg,
-                min_intersaccade_duration=min_saccade_duration,
-                min_saccade_duration=min_saccade_duration,
-                max_pso_duration=max_pso_duration,
-                saccade_detection=saccade_detection):
-            yield e
-
-        # lastly, the current saccade becomes the previous one
-        prev_sacc = ev
-        prev_pso = None
-
-    if prev_sacc is not None and prev_sacc['end_time'] == end:
-        return
-
-    lgr.error("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
-    # and for everything beyond the last saccade (if there was any)
-    for e in classify_intersaccade_period(
-            data,
-            start if prev_sacc is None else prev_sacc['end_time'],
-            end,
-            px2deg=px2deg,
-            min_intersaccade_duration=min_saccade_duration,
-            min_saccade_duration=min_saccade_duration,
-            max_pso_duration=max_pso_duration,
-            saccade_detection=saccade_detection):
-        yield e
-
-
-def classify_intersaccade_period(
-        data,
-        start,
-        end,
-        px2deg,
-        min_intersaccade_duration,
-        min_saccade_duration,
-        max_pso_duration,
-        saccade_detection):
-    lgr.warn('Process ISP [%i, %i] -> %i', start, end, end - start)
-
-    # split the ISP up into its non-NaN pieces:
-    win_start = None
-    for idx in range(start, end):
-        if win_start is None and not np.isnan(data['x'][idx]):
-            win_start = idx
-        elif win_start is not None and \
-                ((idx == end - 1) or np.isnan(data['x'][idx])):
-            for e in _classify_intersaccade_period(
-                    data,
-                    win_start,
-                    idx,
-                    px2deg,
-                    min_intersaccade_duration,
-                    min_saccade_duration,
-                    max_pso_duration,
-                    saccade_detection):
-                yield e
-            # reset non-NaN window start
-            win_start = None
-
-
-def _classify_intersaccade_period(
-        data,
-        start,
-        end,
-        px2deg,
-        min_intersaccade_duration,
-        min_saccade_duration,
-        max_pso_duration,
-        saccade_detection):
-    # no NaN values in data!
-    lgr.warn('Process non-NaN segment in ISP [%i, %i] -> %i', start, end, end - start)
-
-    label_remap = {
-        'SACC': 'ISAC',
-        'HPSO': 'IHPS',
-        'LPSO': 'ILPS',
-    }
-
-    length = end - start
-    # detect saccades, if the there is enough space to maintain minimal distance
-    # to other saccades
-    if length > (
-            2 * min_intersaccade_duration) + min_saccade_duration + max_pso_duration:
-        lgr.warn('Perform saccade detection in ISP ')
-        saccades = _detect_saccades(
-            None,
-            data,
-            start,
-            end,
-            px2deg=px2deg,
-            min_intersaccade_duration=min_intersaccade_duration,
-            context=None,
-            min_saccade_duration=min_saccade_duration,
-            max_saccade_freq=None,
-            max_pso_duration=max_pso_duration)
-        saccade_events = []
-        if saccades is not None:
-            kill_pso = False
-            for s in saccades:
-                if kill_pso:
-                    kill_pso = False
-                    if s['label'].endswith('PSO'):
-                        continue
-                if s['start_time'] - start < min_intersaccade_duration or \
-                        end - s['end_time'] < min_intersaccade_duration:
-                    # to close to another saccade
-                    kill_pso = True
-                    continue
-                s['label'] = label_remap.get(s['label'], s['label'])
-                # need to make a copy of the dict to not have outside modification
-                # interfere with further inside processing
-                yield s.copy()
-                saccade_events.append(s)
-        if saccade_events:
-            lgr.warn('Found additional saccades in ISP')
-            lgr.error('INNER_CLASSIFY %i, %i <- %i', start, end, len(saccade_events))
-            # and now process the intervals between the saccades
-            for e in _classify_intersaccade_periods(
-                    data,
-                    start,
-                    end,
-                    saccade_events,
-                    px2deg,
-                    min_intersaccade_duration,
-                    min_saccade_duration,
-                    max_pso_duration,
-                    saccade_detection=False):
-                yield e
-            return
-
-    max_amp, label = _fix_or_pursuit(data, start, end)
-    #if _is_fixation(data):
-    if label is not None:
-        yield mk_event_record(
-            data,
-            max_amp,
+    def _mk_event_record(self, data, idx, label, start, end):
+        return dict(zip(self.record_field_names, (
+            idx,
             label,
             start,
             end,
-            px2deg)
+            data[start]['x'],
+            data[start]['y'],
+            data[end - 1]['x'],
+            data[end - 1]['y']) +
+            self._get_signal_props(data[start:end])))
 
+    def __call__(self, data, classify_isp=True, sort_events=True):
+        # find threshold velocities
+        sac_peak_med_velthresh, sac_onset_med_velthresh = \
+            self.get_adaptive_saccade_velocity_velthresh(data['med_vel'])
+        lgr.info(
+            'Global saccade MEDIAN velocity thresholds: '
+            '%.1f, %.1f (onset, peak)',
+            sac_onset_med_velthresh, sac_peak_med_velthresh)
 
-# TODO pass params in
-def _fix_or_pursuit(data, start, end, min_fixation_duration=40, px2deg=0.0185581232561, max_fixation_amp=0.7):
-    win_data = data[start:end].copy()
+        saccade_locs = find_peaks(
+            data['med_vel'],
+            sac_peak_med_velthresh)
 
-    if len(win_data) < min_fixation_duration:
-        return None, None
+        events = []
+        saccade_events = []
+        for e in self._detect_saccades(
+                saccade_locs,
+                data,
+                0,
+                len(data),
+                context=self.sac_context_winlen):
+            saccade_events.append(e.copy())
+            events.append(e)
 
-    def _butter_lowpass(cutoff, fs, order=5):
-        nyq = 0.5 * fs
-        normal_cutoff = cutoff / nyq
-        b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
-        return b, a
+        lgr.info('Start ISP classification')
 
-    b, a = _butter_lowpass(10.0, 1000.0)
-    win_data['x'] = signal.filtfilt(b, a, win_data['x'], method='gust')
-    win_data['y'] = signal.filtfilt(b, a, win_data['y'], method='gust')
+        if classify_isp:
+            events.extend(self._classify_intersaccade_periods(
+                data,
+                0,
+                len(data),
+                # needs to be in order of appearance
+                sorted(saccade_events, key=lambda x: x['start_time']),
+                saccade_detection=True))
 
-    win_data = win_data[10:-10]
-    start_x = win_data[0]['x']
-    start_y = win_data[0]['y']
+        # make timing info absolute times, not samples
+        for e in events:
+            for i in ('start_time', 'end_time'):
+                e[i] = e[i] / self.sr
 
-    # determine max location deviation from start coordinate
-    amp = (((start_x - win_data['x']) ** 2 +
-            (start_y - win_data['y']) ** 2) ** 0.5)
-    amp_argmax = amp.argmax()
-    max_amp = amp[amp_argmax] * px2deg
-    #print('MAX IN WIN [{}:{}]@{:.1f})'.format(start, end, max_amp))
+        return sorted(events, key=lambda x: x['start_time']) \
+            if sort_events else events
 
-    if max_amp > max_fixation_amp:
-        return max_amp, 'PURS'
-    return max_amp, 'FIXA'
+    def _detect_saccades(
+            self,
+            candidate_locs,
+            data,
+            start,
+            end,
+            context):
+
+        saccade_events = []
+
+        if context is None:
+            # no context size was given, use all data
+            # to determine velocity thresholds
+            lgr.debug(
+                'Determine velocity thresholds on full segment '
+                '[%i, %i]', start, end)
+            sac_peak_velthresh, sac_onset_velthresh = \
+                self.get_adaptive_saccade_velocity_velthresh(
+                    data['vel'][start:end])
+            if candidate_locs is None:
+                lgr.debug(
+                    'Find velocity peaks on full segment '
+                    '[%i, %i]', start, end)
+                candidate_locs = [
+                    (e[0] + start, e[1] + start, e[2]) for e in find_peaks(
+                        data['vel'][start:end],
+                        sac_peak_velthresh)]
+
+        # status map indicating which event class any timepoint has been
+        # assigned to so far
+        status = np.zeros((len(data),), dtype=int)
+
+        # loop over all peaks sorted by the sum of their velocities
+        # i.e. longer and faster goes first
+        for i, props in enumerate(sorted(
+                candidate_locs, key=lambda x: x[2].sum(), reverse=True)):
+            sacc_start, sacc_end, peakvels = props
+            lgr.info(
+                'Process peak velocity window [%i, %i] at ~%.1f deg/s',
+                sacc_start, sacc_end, peakvels.mean())
+
+            if context:
+                # extract velocity data in the vicinity of the peak to
+                # calibrate threshold
+                win_start = max(
+                    start,
+                    sacc_start - int(context / 2))
+                win_end = min(
+                    end,
+                    sacc_end + context - (sacc_start - win_start))
+                lgr.debug(
+                    'Determine velocity thresholds in context window '
+                    '[%i, %i]', win_start, win_end)
+                lgr.debug('Actual context window: [%i, %i] -> %i',
+                          win_start, win_end, win_end - win_start)
+
+                sac_peak_velthresh, sac_onset_velthresh = \
+                    self.get_adaptive_saccade_velocity_velthresh(
+                        data['vel'][win_start:win_end])
+
+            lgr.info('Active saccade velocity thresholds: '
+                     '%.1f, %.1f (onset, peak)',
+                     sac_onset_velthresh, sac_peak_velthresh)
+
+            # move backwards in time to find the saccade onset
+            sacc_start = find_saccade_onsetidx(
+                data['vel'], sacc_start, sac_onset_velthresh)
+
+            # move forward in time to find the saccade offset
+            sacc_end = find_movement_offsetidx(
+                data['vel'], sacc_end, sac_onset_velthresh)
+
+            sacc_data = data[sacc_start:sacc_end]
+            if sacc_end - sacc_start < self.min_sac_dur:
+                lgr.debug('Skip saccade candidate, too short')
+                continue
+            elif np.sum(np.isnan(sacc_data['x'])):
+                lgr.debug('Skip saccade candidate, missing data')
+                continue
+            elif status[
+                    max(0,
+                        sacc_start - self.min_intersac_dur):min(
+                    len(data), sacc_end + self.min_intersac_dur)].sum():
+                lgr.debug('Skip saccade candidate, too close to another event')
+                continue
+
+            lgr.debug('Found SACCADE [%i, %i]',
+                      sacc_start, sacc_end)
+            event = self._mk_event_record(data, i, "SACC", sacc_start, sacc_end)
+
+            yield event.copy()
+            saccade_events.append(event)
+
+            # mark as a saccade
+            status[sacc_start:sacc_end] = 1
+
+            pso = find_psoend(
+                data['vel'][sacc_end:sacc_end + self.max_pso_dur],
+                sac_onset_velthresh,
+                sac_peak_velthresh)
+            if pso:
+                pso_label, pso_end = pso
+                lgr.debug('Found %s [%i, %i]',
+                          pso_label, sacc_end, pso_end)
+                psoevent = self._mk_event_record(
+                    data, i, pso_label, sacc_end, sacc_end + pso_end)
+                yield psoevent.copy()
+                # mark as a saccade part
+                status[sacc_end:sacc_end + pso_end] = 1
+
+            if self.max_sac_freq and \
+                    float(len(saccade_events)) / len(data) > self.max_sac_freq:
+                lgr.info('Stop initial saccade detection, max frequency '
+                         'reached')
+                break
+
+    def _classify_intersaccade_periods(
+            self,
+            data,
+            start,
+            end,
+            saccade_events,
+            saccade_detection):
+
+        lgr.warn(
+            'Determine ISPs %i, %i <- %i',
+            start, end, len(saccade_events))
+
+        prev_sacc = None
+        prev_pso = None
+        for ev in saccade_events:
+            if prev_sacc is None:
+                if 'SAC' not in ev['label']:
+                    continue
+            elif prev_pso is None and 'PS' in ev['label']:
+                prev_pso = ev
+                continue
+            elif 'SAC' not in ev['label']:
+                continue
+
+            # at this point we have a previous saccade (and possibly its PSO)
+            # on record, and we have just found the next saccade
+            # -> inter-saccade window is determined
+            if prev_sacc is None:
+                win_start = start
+            else:
+                if prev_pso is not None:
+                    win_start = prev_pso['end_time']
+                else:
+                    win_start = prev_sacc['end_time']
+            # enforce dtype for indexing
+            win_end = ev['start_time']
+            if win_start == win_end:
+                prev_sacc = ev
+                prev_pso = None
+                continue
+
+            for e in self._classify_intersaccade_period(
+                    data,
+                    win_start,
+                    win_end,
+                    saccade_detection=saccade_detection):
+                yield e
+
+            # lastly, the current saccade becomes the previous one
+            prev_sacc = ev
+            prev_pso = None
+
+        if prev_sacc is not None and prev_sacc['end_time'] == end:
+            return
+
+        lgr.error("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
+        # and for everything beyond the last saccade (if there was any)
+        for e in self._classify_intersaccade_period(
+                data,
+                start if prev_sacc is None else prev_sacc['end_time'],
+                end,
+                saccade_detection=saccade_detection):
+            yield e
+
+    def _classify_intersaccade_period(
+            self,
+            data,
+            start,
+            end,
+            saccade_detection):
+        lgr.warn('Process ISP [%i, %i] -> %i', start, end, end - start)
+
+        # split the ISP up into its non-NaN pieces:
+        win_start = None
+        for idx in range(start, end):
+            if win_start is None and not np.isnan(data['x'][idx]):
+                win_start = idx
+            elif win_start is not None and \
+                    ((idx == end - 1) or np.isnan(data['x'][idx])):
+                for e in self._classify_intersaccade_period_helper(
+                        data,
+                        win_start,
+                        idx,
+                        saccade_detection):
+                    yield e
+                # reset non-NaN window start
+                win_start = None
+
+    def _classify_intersaccade_period_helper(
+            self,
+            data,
+            start,
+            end,
+            saccade_detection):
+        # no NaN values in data at this point!
+        lgr.warn(
+            'Process non-NaN segment in ISP [%i, %i] -> %i',
+            start, end, end - start)
+
+        label_remap = {
+            'SACC': 'ISAC',
+            'HPSO': 'IHPS',
+            'LPSO': 'ILPS',
+        }
+
+        length = end - start
+        # detect saccades, if the there is enough space to maintain minimal
+        # distance to other saccades
+        if length > (
+                2 * self.min_intersac_dur) \
+                + self.min_sac_dur + self.max_pso_dur:
+            lgr.warn('Perform saccade detection in ISP ')
+            saccades = self._detect_saccades(
+                None,
+                data,
+                start,
+                end,
+                context=None)
+            saccade_events = []
+            if saccades is not None:
+                kill_pso = False
+                for s in saccades:
+                    if kill_pso:
+                        kill_pso = False
+                        if s['label'].endswith('PSO'):
+                            continue
+                    if s['start_time'] - start < self.min_intersac_dur or \
+                            end - s['end_time'] < self.min_intersac_dur:
+                        # to close to another saccade
+                        kill_pso = True
+                        continue
+                    s['label'] = label_remap.get(s['label'], s['label'])
+                    # need to make a copy of the dict to not have outside
+                    # modification interfere with further inside processing
+                    yield s.copy()
+                    saccade_events.append(s)
+            if saccade_events:
+                lgr.warn('Found additional saccades in ISP')
+                # and now process the intervals between the saccades
+                for e in self._classify_intersaccade_periods(
+                        data,
+                        start,
+                        end,
+                        saccade_events,
+                        saccade_detection=False):
+                    yield e
+                return
+
+        max_amp, label = self._fix_or_pursuit(data, start, end)
+        if label is not None:
+            yield self._mk_event_record(
+                data,
+                max_amp,
+                label,
+                start,
+                end)
+
+    def _fix_or_pursuit(self, data, start, end):
+        win_data = data[start:end].copy()
+
+        if len(win_data) < self.min_fix_dur:
+            return None, None
+
+        def _butter_lowpass(cutoff, fs, order=5):
+            nyq = 0.5 * fs
+            normal_cutoff = cutoff / nyq
+            b, a = signal.butter(
+                order,
+                normal_cutoff,
+                btype='low',
+                analog=False)
+            return b, a
+
+        b, a = _butter_lowpass(10.0, 1000.0)
+        win_data['x'] = signal.filtfilt(b, a, win_data['x'], method='gust')
+        win_data['y'] = signal.filtfilt(b, a, win_data['y'], method='gust')
+
+        win_data = win_data[10:-10]
+        start_x = win_data[0]['x']
+        start_y = win_data[0]['y']
+
+        # determine max location deviation from start coordinate
+        amp = (((start_x - win_data['x']) ** 2 +
+                (start_y - win_data['y']) ** 2) ** 0.5)
+        amp_argmax = amp.argmax()
+        max_amp = amp[amp_argmax] * self.px2deg
+        #print('MAX IN WIN [{}:{}]@{:.1f})'.format(start, end, max_amp))
+
+        if max_amp > self.max_fix_amp:
+            return max_amp, 'PURS'
+        return max_amp, 'FIXA'
 
 
 if __name__ == '__main__':

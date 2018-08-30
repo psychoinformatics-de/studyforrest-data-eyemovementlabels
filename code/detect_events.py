@@ -2,6 +2,7 @@
 # -*- coding: iso-8859-15 -*-
 import numpy as np
 from statsmodels.robust.scale import mad
+from scipy import signal
 import sys
 import gzip
 
@@ -57,14 +58,16 @@ def get_adaptive_saccade_velocity_velthresh(vels, start=300.0):
         return avg + 10 * sd, avg, sd
 
     # re-compute threshold until value converges
+    count = 0
     dif = 2
-    while dif > 1:  # less than 1deg/s difference
+    while dif > 1 and count < 30:  # less than 1deg/s difference
         old_thresh = cur_thresh
         cur_thresh, avg, sd = _get_thresh(old_thresh)
         lgr.debug(
             'Saccade threshold velocity: %.1f (non-saccade mvel: %.1f, stdvel: %.1f)',
             cur_thresh, avg, sd)
         dif = abs(old_thresh - cur_thresh)
+        count += 1
 
     return cur_thresh, (avg + 5 * sd)
 
@@ -448,12 +451,14 @@ def _classify_intersaccade_periods(
         prev_sacc = ev
         prev_pso = None
 
-    lgr.error("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
+    if prev_sacc is not None and prev_sacc['end_time'] == end:
+        return
 
+    lgr.error("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
     # and for everything beyond the last saccade (if there was any)
     for e in classify_intersaccade_period(
             data,
-            start if prev_sacc is None else int(prev_sacc['end_time']),
+            start if prev_sacc is None else prev_sacc['end_time'],
             end,
             px2deg=px2deg,
             min_intersaccade_duration=min_saccade_duration,
@@ -476,11 +481,11 @@ def classify_intersaccade_period(
 
     # split the ISP up into its non-NaN pieces:
     win_start = None
-    for idx in range(start, end + 1):
+    for idx in range(start, end):
         if win_start is None and not np.isnan(data['x'][idx]):
             win_start = idx
         elif win_start is not None and \
-                (idx == end or np.isnan(data['x'][idx])):
+                ((idx == end - 1) or np.isnan(data['x'][idx])):
             for e in _classify_intersaccade_period(
                     data,
                     win_start,
@@ -518,7 +523,7 @@ def _classify_intersaccade_period(
     # to other saccades
     if length > (
             2 * min_intersaccade_duration) + min_saccade_duration + max_pso_duration:
-        lgr.warn('Perform saccade detection in ISP')
+        lgr.warn('Perform saccade detection in ISP ')
         saccades = _detect_saccades(
             None,
             data,
@@ -565,13 +570,49 @@ def _classify_intersaccade_period(
                 yield e
             return
 
+    max_amp, label = _fix_or_pursuit(data, start, end)
     #if _is_fixation(data):
-    yield mk_event_record(
-            data, 0, "FIXA", start, end, px2deg)
+    if label is not None:
+        yield mk_event_record(
+            data,
+            max_amp,
+            label,
+            start,
+            end,
+            px2deg)
 
 
-def _is_fixation(data, velthresh=30.0):
-    return data['vel'].max() < velthresh
+# TODO pass params in
+def _fix_or_pursuit(data, start, end, min_fixation_duration=40, px2deg=0.0185581232561, max_fixation_amp=0.7):
+    win_data = data[start:end].copy()
+
+    if len(win_data) < min_fixation_duration:
+        return None, None
+
+    def _butter_lowpass(cutoff, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+        return b, a
+
+    b, a = _butter_lowpass(10.0, 1000.0)
+    win_data['x'] = signal.filtfilt(b, a, win_data['x'], method='gust')
+    win_data['y'] = signal.filtfilt(b, a, win_data['y'], method='gust')
+
+    win_data = win_data[10:-10]
+    start_x = win_data[0]['x']
+    start_y = win_data[0]['y']
+
+    # determine max location deviation from start coordinate
+    amp = (((start_x - win_data['x']) ** 2 +
+            (start_y - win_data['y']) ** 2) ** 0.5)
+    amp_argmax = amp.argmax()
+    max_amp = amp[amp_argmax] * px2deg
+    #print('MAX IN WIN [{}:{}]@{:.1f})'.format(start, end, max_amp))
+
+    if max_amp > max_fixation_amp:
+        return max_amp, 'PURS'
+    return max_amp, 'FIXA'
 
 
 if __name__ == '__main__':

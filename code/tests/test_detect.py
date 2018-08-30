@@ -109,6 +109,7 @@ def test_real_data():
     if isp_events is not None and len(isp_events):
         events.extend(isp_events)
 
+    #print("END")
     #for e in sorted(events, key=lambda x: x['start_time']):
     #    print(e)
     ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
@@ -122,11 +123,51 @@ def test_real_data():
     #    np.linspace(0, 48000 / 1000.0, 48000),
     #    med_y[:48000])
     #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    #import pandas as pd
-    #events = pd.DataFrame(events)
-    #saccades = events[events['label'] == 'SACC']
-    #isaccades = events[events['label'] == 'ISAC']
-    #print('#saccades', len(saccades), len(isaccades))
-    #pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
-    #pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
-    #pl.show()
+    import pandas as pd
+    events = pd.DataFrame(events)
+    saccades = events[events['label'] == 'SACC']
+    isaccades = events[events['label'] == 'ISAC']
+    print('#saccades', len(saccades), len(isaccades))
+    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
+    pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
+    pl.show()
+
+
+def test_smooth():
+    data = np.recfromcsv(
+        #'inputs/raw_eyegaze/sub-09/ses-movie/func/sub-09_ses-movie_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
+        'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
+        delimiter='\t',
+        names=['x', 'y', 'pupil', 'frame'])
+    #nospikes = pp.filter_spikes(data.copy())
+    #from scipy.ndimage import median_filter
+    #med_x = median_filter(nospikes['x'], size=100)
+    #med_y = median_filter(nospikes['y'], size=100)
+
+    p = pp.preproc(
+        data[:50000],
+        savgol_length=0.019, savgol_polyord=2,
+        dilate_nan=0.01,
+        px2deg=0.0185581232561,
+        sampling_rate=1000.0,
+    )
+
+    #trial = p[9588:9844]
+    trial = p[34859:35690]
+
+    f = data[:len(trial)]
+    f[:] = np.nan
+
+    from scipy import signal
+
+    def _butter_lowpass(cutoff, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+        return b, a
+
+    b, a = _butter_lowpass(20.0, 1000.0)
+    f['x'] = signal.filtfilt(b, a, trial['x'], method='gust')
+    f['y'] = signal.filtfilt(b, a, trial['y'], method='gust')
+
+    ut.show_gaze(data=f, pp=trial, events=None, px2deg=0.0185581232561)

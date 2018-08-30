@@ -78,6 +78,7 @@ def samp2file(data, fname):
 def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0):
     colors = {
         'FIXA': 'gray',
+        'PURS': 'red',
         'SACC': 'green',
         'ISAC': 'pink',
         'HPSO': 'yellow',
@@ -92,7 +93,17 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
             np.linspace(0, len(data) / sampling_rate, len(data)),
             data['x'],
             color='blue')
+        pl.plot(
+            np.linspace(0, len(data) / sampling_rate, len(data)),
+            data['y'],
+            color='blue')
     if pp is not None:
+        pl.plot(
+            np.linspace(0, len(pp) / sampling_rate, len(pp)),
+            pp['vel'],
+            #(pp['accel'] / np.abs(pp['accel'][~np.isnan(pp['accel'])]).max()) * 1000,
+            #(pp['accel'] / np.abs(pp['accel']).max()) * 1000,
+            color='gray')
         pl.plot(
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['x'],
@@ -101,14 +112,10 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['y'],
             color='orange')
-        pl.plot(
-            np.linspace(0, len(pp) / sampling_rate, len(pp)),
-            pp['vel'],
-            color='gray')
-        pl.plot(
-            np.linspace(0, len(pp) / sampling_rate, len(pp)),
-            pp['med_vel'],
-            color='black')
+        #pl.plot(
+        #    np.linspace(0, len(pp) / sampling_rate, len(pp)),
+        #    pp['med_vel'],
+        #    color='black')
     if events is not None:
         for ev in events:
             pl.axvspan(
@@ -116,5 +123,5 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
                 ev['end_time'],
                 color=colors[ev['label']],
                 alpha=0.3)
-            pl.text(ev['start_time'], 0, '{}'.format(ev['id']), color='red')
+            pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['id']), color='red')
     pl.show()

@@ -10,7 +10,7 @@ common_args = dict(
 
 
 def test_no_saccade():
-    samp = np.random.randn(1001)
+    samp = np.random.randn(1000)
     data = ut.expand_samp(samp, y=0.0)
     clf = d.EyegazeClassifier(**common_args)
     p = clf.preproc(data, savgol_length=0.0, dilate_nan=0)
@@ -47,10 +47,9 @@ def test_one_saccade():
         # full set
         assert list(events['label']) == ['FIXA', 'ISAC', 'ILPS', 'FIXA'] or \
             list(events['label']) == ['FIXA', 'ISAC', 'IHPS', 'FIXA']
-        # TODO bring back!
-        #for i in range(0, len(events) - 1):
-        #    # complete segmentation
-        #    assert events['start_time'][i + 1] == events['end_time'][i]
+        for i in range(0, len(events) - 1):
+            # complete segmentation
+            assert events['start_time'][i + 1] == events['end_time'][i]
 
 
 def test_too_long_pso():

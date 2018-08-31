@@ -522,11 +522,11 @@ class EyegazeClassifier(object):
 
         # split the ISP up into its non-NaN pieces:
         win_start = None
-        for idx in range(start, end):
+        for idx in range(start, end + 1):
             if win_start is None and not np.isnan(data['x'][idx]):
                 win_start = idx
             elif win_start is not None and \
-                    ((idx == end - 1) or np.isnan(data['x'][idx])):
+                    ((idx == end) or np.isnan(data['x'][idx])):
                 for e in self._classify_intersaccade_period_helper(
                         data,
                         win_start,

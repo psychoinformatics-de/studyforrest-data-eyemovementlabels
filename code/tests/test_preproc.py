@@ -1,6 +1,6 @@
 import numpy as np
 from . import utils as ut
-from .. import preprocess_eyegaze_recordings as pp
+from .. import detect_events as d
 
 
 common_args = dict(
@@ -9,10 +9,13 @@ common_args = dict(
 )
 
 
+def test_px2deg():
+    assert (d.deg_per_pixel(26.5, 63, 1280) - 0.0185546875) < 0.0001
+
 def test_spike_filter():
     samp = np.random.randn(1000)
     data = ut.expand_samp(samp, y=0.0)
-    p = pp.filter_spikes(data.copy())
+    p = d.filter_spikes(data.copy())
     assert np.std(data['x']) > np.std(p['x'])
     assert data['x'][0] == p['x'][0]
     assert data['x'][-1] == p['x'][-1]

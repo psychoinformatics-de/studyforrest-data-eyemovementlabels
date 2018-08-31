@@ -8,9 +8,29 @@ from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing 
 from scipy.ndimage import median_filter
 import sys
 import gzip
+from math import (
+    degrees,
+    atan2,
+)
 
 import logging
 lgr = logging.getLogger('studyforrest.detect_eyegaze_events')
+
+
+def deg_per_pixel(screen_size, viewing_distance, screen_resolution):
+    """Determine `px2deg` factor for EyegazeClassifier
+
+    Parameters
+    ----------
+    screen_size : float
+      Either vertical or horizontal dimension of the screen in any unit.
+    viewing_distance : float
+      Viewing distance from the screen in the same unit as `screen_size`.
+    screen_resolution : int
+      Number of pixels along the dimensions reported for `screen_size`.
+    """
+    return degrees(atan2(.5 * screen_size, viewing_distance)) / \
+        (.5 * screen_resolution)
 
 
 def find_peaks(vels, threshold):

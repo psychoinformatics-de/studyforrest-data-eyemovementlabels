@@ -23,6 +23,8 @@ def test_real_data():
 
     clf = d.EyegazeClassifier(
         min_intersaccade_duration=0.04,
+        # high threshold, static stimuli, should not have pursuit
+        max_fixation_amp=4.0,
         **common_args)
     p = clf.preproc(data, dilate_nan=0.03)
 

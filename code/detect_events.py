@@ -426,9 +426,17 @@ class EyegazeClassifier(object):
                           pso_label, sacc_end, pso_end)
                 psoevent = self._mk_event_record(
                     data, i, pso_label, sacc_end, sacc_end + pso_end)
-                yield psoevent.copy()
-                # mark as a saccade part
-                status[sacc_end:sacc_end + pso_end] = 1
+                if psoevent['amp'] < saccade_events[-1]['amp']:
+                    # discard PSO with amplitudes larger than their
+                    # anchor saccades
+                    yield psoevent.copy()
+                    # mark as a saccade part
+                    status[sacc_end:sacc_end + pso_end] = 1
+                else:
+                    lgr.debug(
+                        'Ignore PSO, amplitude large than that of '
+                        'the previous saccade: %.1f >= %.1f',
+                        psoevent['amp'], saccade_events[-1]['amp'])
 
             if self.max_sac_freq and \
                     float(len(saccade_events)) / len(data) > self.max_sac_freq:

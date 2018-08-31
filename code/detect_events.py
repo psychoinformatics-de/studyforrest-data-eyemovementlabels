@@ -693,17 +693,18 @@ class EyegazeClassifier(object):
         # convert from px/sample to deg/s
         velocities *= self.px2deg * self.sr
 
-        med_velocities = np.zeros((len(data),), velocities.dtype)
-        med_velocities[1:] = (
-            np.diff(median_filter(data['x'],
-                                  size=median_filter_length)) ** 2 +
-            np.diff(median_filter(data['y'],
-                                  size=median_filter_length)) ** 2) ** 0.5
-        # convert from px/sample to deg/s
-        med_velocities *= self.px2deg * self.sr
-        # remove any velocity bordering NaN
-        med_velocities[get_dilated_nan_mask(
-            med_velocities, dilate_nan, 0)] = np.nan
+        if median_filter_length:
+            med_velocities = np.zeros((len(data),), velocities.dtype)
+            med_velocities[1:] = (
+                np.diff(median_filter(data['x'],
+                                      size=median_filter_length)) ** 2 +
+                np.diff(median_filter(data['y'],
+                                      size=median_filter_length)) ** 2) ** 0.5
+            # convert from px/sample to deg/s
+            med_velocities *= self.px2deg * self.sr
+            # remove any velocity bordering NaN
+            med_velocities[get_dilated_nan_mask(
+                med_velocities, dilate_nan, 0)] = np.nan
 
         # replace "too fast" velocities with previous velocity
         # add missing first datapoint
@@ -724,13 +725,15 @@ class EyegazeClassifier(object):
         acceleration = np.zeros(velocities.shape, velocities.dtype)
         acceleration[1:] = (velocities[1:] - velocities[:-1]) * self.sr
 
-        return np.core.records.fromarrays([
-            med_velocities,
+        arrs = [med_velocities] if median_filter_length else []
+        names = ['med_vel'] if median_filter_length else []
+        arrs.extend([
             velocities,
             acceleration,
             data['x'],
-            data['y']],
-            names=['med_vel', 'vel', 'accel', 'x', 'y'])
+            data['y']])
+        names.extend(['vel', 'accel', 'x', 'y'])
+        return np.core.records.fromarrays(arrs, names=names)
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ def test_real_data():
         'inputs/event_detector_1.1/1_13.csv',
         usecols=[0, 1])
     # when both coords are zero -> missing data
-    data[np.logical_and(data['x'] == 0, data['y'] == 0)] = np.nan
+    data[np.logical_and(data['x'] == 0, data['y'] == 0)] = (np.nan, np.nan)
 
     clf = d.EyegazeClassifier(
         min_intersaccade_duration=0.04,

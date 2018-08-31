@@ -125,3 +125,8 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
                 alpha=0.3)
             pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['id']), color='red')
     pl.show()
+
+
+def events2df(events):
+    import pandas as pd
+    return pd.DataFrame(events)

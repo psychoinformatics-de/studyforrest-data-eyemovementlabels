@@ -255,6 +255,11 @@ class EyegazeClassifier(object):
         while dif > 1 and count < 30:  # less than 1deg/s difference
             old_thresh = cur_thresh
             cur_thresh, med, scale = _get_thresh(old_thresh)
+            if not cur_thresh:
+                # safe-guard in case threshold runs to zero in
+                # case of really clean and sparse data
+                cur_thresh = old_thresh
+                break
             lgr.debug(
                 'Saccade threshold velocity: %.1f '
                 '(non-saccade mvel: %.1f, stdvel: %.1f)',

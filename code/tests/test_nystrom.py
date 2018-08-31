@@ -30,9 +30,12 @@ def test_real_data():
 
     events = clf(p)
 
+    # TODO compare against output from original matlab code
+    return
     for e in events:
         print('{:.2f} -> {:.2f}: {} ({})'.format(
             e['start_time'], e['end_time'], e['label'], e['id']))
+
     ut.show_gaze(pp=p, events=events, **common_args)
     import pylab as pl
     import pandas as pd

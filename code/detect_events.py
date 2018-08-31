@@ -151,11 +151,6 @@ def filter_spikes(data):
     return data
 
 
-def get_non_nan_clusters(arr):
-    clusters, nclusters = ndimage.label(~np.isnan(arr))
-    return clusters, nclusters
-
-
 def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     clusters, nclusters = ndimage.label(np.isnan(arr))
     # go through all clusters and remove any cluster that is less
@@ -400,7 +395,8 @@ class EyegazeClassifier(object):
             if sacc_end - sacc_start < self.min_sac_dur:
                 lgr.debug('Skip saccade candidate, too short')
                 continue
-            elif np.sum(np.isnan(sacc_data['x'])):
+            elif np.sum(np.isnan(sacc_data['x'])):  # pragma: no cover
+                # should not happen
                 lgr.debug('Skip saccade candidate, missing data')
                 continue
             elif status[
@@ -449,8 +445,8 @@ class EyegazeClassifier(object):
             saccade_detection):
 
         lgr.warn(
-            'Determine ISPs %i, %i (%i saccade-related events)\n%s',
-            start, end, len(saccade_events), saccade_events)
+            'Determine ISPs %i, %i (%i saccade-related events)',
+            start, end, len(saccade_events))
 
         prev_sacc = None
         prev_pso = None

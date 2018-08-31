@@ -63,16 +63,14 @@ def test_too_long_pso():
         pso=80,
         pso_dist=100)
     data = ut.expand_samp(samp, y=0.0)
-    nospikes = pp.filter_spikes(data.copy())
-    p = pp.preproc(
-        nospikes, savgol_length=0.019, savgol_polyord=2,
-        dilate_nan=0, **common_args)
-    events = d.detect(p, 50.0, **common_args)
-    ut.show_gaze(data, p, events)
-    return
-    assert events[2]['label'] == 'LPSO'
-    # TODO ATM it cannot detect that, figure out whether it should
-    assert events[2]['duration'] > 80
+    clf = d.EyegazeClassifier(
+        max_initial_saccade_freq=.2,
+        **common_args)
+    p = clf.preproc(data, dilate_nan=0)
+    events = clf(p)
+    events = ut.events2df(events)
+    # there is no PSO detected
+    assert list(events['label']) == ['FIXA', 'SACC', 'FIXA']
 
 
 def test_real_data():
@@ -92,62 +90,20 @@ def test_real_data():
         #p,
     )
 
-    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
-    #events = None
-    import pylab as pl
-    #pl.plot(
-    #    np.linspace(0, 48000 / 1000.0, 48000),
-    #    med_x[:48000])
-    #pl.plot(
-    #    np.linspace(0, 48000 / 1000.0, 48000),
-    #    med_y[:48000])
+    events = ut.events2df(events)
+
+    labels = list(events['label'])
+    # find find all kinds of events
+    for t in ('FIXA', 'PURS', 'SACC', 'LPSO', 'HPSO',
+              'ISAC', 'ILPS', 'IHPS'):
+        assert t in labels
+
     #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    import pandas as pd
-    events = pd.DataFrame(events)
-    saccades = events[events['label'] == 'SACC']
-    isaccades = events[events['label'] == 'ISAC']
-    print('#saccades', len(saccades), len(isaccades))
-    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
-    pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
-    pl.show()
-
-
-def test_smooth():
-    data = np.recfromcsv(
-        #'inputs/raw_eyegaze/sub-09/ses-movie/func/sub-09_ses-movie_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
-        'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
-        delimiter='\t',
-        names=['x', 'y', 'pupil', 'frame'])
-    #nospikes = pp.filter_spikes(data.copy())
-    #from scipy.ndimage import median_filter
-    #med_x = median_filter(nospikes['x'], size=100)
-    #med_y = median_filter(nospikes['y'], size=100)
-
-    p = pp.preproc(
-        data[:50000],
-        savgol_length=0.019, savgol_polyord=2,
-        dilate_nan=0.01,
-        px2deg=0.0185581232561,
-        sampling_rate=1000.0,
-    )
-
-    #trial = p[9588:9844]
-    trial = p[34859:35690]
-
-    f = data[:len(trial)]
-    f[:] = np.nan
-
-    from scipy import signal
-
-    def _butter_lowpass(cutoff, fs, order=5):
-        nyq = 0.5 * fs
-        normal_cutoff = cutoff / nyq
-        b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
-        return b, a
-
-    b, a = _butter_lowpass(20.0, 1000.0)
-    f['x'] = signal.filtfilt(b, a, trial['x'], method='gust')
-    f['y'] = signal.filtfilt(b, a, trial['y'], method='gust')
-
-    ut.show_gaze(data=f, pp=trial, events=None, px2deg=0.0185581232561)
+    #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
+    #import pylab as pl
+    #saccades = events[events['label'] == 'SACC']
+    #isaccades = events[events['label'] == 'ISAC']
+    #print('#saccades', len(saccades), len(isaccades))
+    #pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
+    #pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
+    #pl.show()

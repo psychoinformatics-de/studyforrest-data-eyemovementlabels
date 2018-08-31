@@ -21,11 +21,16 @@ def test_real_data():
     # when both coords are zero -> missing data
     data[np.logical_and(data['x'] == 0, data['y'] == 0)] = np.nan
 
-    clf = d.EyegazeClassifier(**common_args)
-    p = clf.preproc(data)
+    clf = d.EyegazeClassifier(
+        min_intersaccade_duration=0.04,
+        **common_args)
+    p = clf.preproc(data, dilate_nan=0.03)
 
     events = clf(p)
 
+    for e in events:
+        print('{:.2f} -> {:.2f}: {} ({})'.format(
+            e['start_time'], e['end_time'], e['label'], e['id']))
     ut.show_gaze(pp=p, events=events, **common_args)
     import pylab as pl
     import pandas as pd
@@ -36,4 +41,3 @@ def test_real_data():
     pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
     pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
     pl.show()
-

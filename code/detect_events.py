@@ -444,8 +444,8 @@ class EyegazeClassifier(object):
             saccade_detection):
 
         lgr.warn(
-            'Determine ISPs %i, %i <- %i',
-            start, end, len(saccade_events))
+            'Determine ISPs %i, %i (%i saccade-related events)\n%s',
+            start, end, len(saccade_events), saccade_events)
 
         prev_sacc = None
         prev_pso = None
@@ -476,6 +476,7 @@ class EyegazeClassifier(object):
                 prev_pso = None
                 continue
 
+            lgr.warn('Found ISP [%i:%i]', win_start, win_end)
             for e in self._classify_intersaccade_period(
                     data,
                     win_start,
@@ -490,11 +491,13 @@ class EyegazeClassifier(object):
         if prev_sacc is not None and prev_sacc['end_time'] == end:
             return
 
-        lgr.error("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
+        lgr.debug("LAST_SEGMENT_ISP: %s -> %s", prev_sacc, prev_pso)
         # and for everything beyond the last saccade (if there was any)
         for e in self._classify_intersaccade_period(
                 data,
-                start if prev_sacc is None else prev_sacc['end_time'],
+                start if prev_sacc is None
+                else prev_sacc['end_time'] if prev_pso is None
+                else prev_pso['end_time'],
                 end,
                 saccade_detection=saccade_detection):
             yield e
@@ -505,7 +508,8 @@ class EyegazeClassifier(object):
             start,
             end,
             saccade_detection):
-        lgr.warn('Process ISP [%i, %i] -> %i', start, end, end - start)
+        lgr.warn('Determine NaN-free intervals in [%i:%i] (%i)',
+                 start, end, end - start)
 
         # split the ISP up into its non-NaN pieces:
         win_start = None
@@ -531,7 +535,7 @@ class EyegazeClassifier(object):
             saccade_detection):
         # no NaN values in data at this point!
         lgr.warn(
-            'Process non-NaN segment in ISP [%i, %i] -> %i',
+            'Process non-NaN segment [%i, %i] -> %i',
             start, end, end - start)
 
         label_remap = {
@@ -546,7 +550,7 @@ class EyegazeClassifier(object):
         if length > (
                 2 * self.min_intersac_dur) \
                 + self.min_sac_dur + self.max_pso_dur:
-            lgr.warn('Perform saccade detection in ISP ')
+            lgr.warn('Perform saccade detection in [%i:%i]', start, end)
             saccades = self._detect_saccades(
                 None,
                 data,
@@ -578,7 +582,8 @@ class EyegazeClassifier(object):
                         data,
                         start,
                         end,
-                        saccade_events,
+                        sorted(saccade_events,
+                               key=lambda x: x['start_time']),
                         saccade_detection=False):
                     yield e
                 return

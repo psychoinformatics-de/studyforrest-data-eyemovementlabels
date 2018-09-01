@@ -61,11 +61,20 @@ def find_peaks(vels, threshold):
             # start of a saccade
             sac_on = i
         elif sac_on is not None and v < threshold:
-            sacs.append([sac_on, i, _get_vels(sac_on, i)])
+            sacs.append([
+                sac_on,
+                i,
+                _get_vels(
+                    sac_on,
+                    min(len(vels), i + 1))
+            ])
             sac_on = None
     if sac_on:
         # end of data, but velocities still high
-        sacs.append([sac_on, len(vels) - 1, _get_vels(sac_on, len(vels) - 1)])
+        sacs.append([
+            sac_on,
+            len(vels) - 1,
+            _get_vels(sac_on, len(vels))])
     return sacs
 
 

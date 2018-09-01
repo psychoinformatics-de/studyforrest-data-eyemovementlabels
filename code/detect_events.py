@@ -174,7 +174,6 @@ def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     return mask
 
 
-
 class EyegazeClassifier(object):
 
     record_field_names = [
@@ -182,7 +181,7 @@ class EyegazeClassifier(object):
         'start_time', 'end_time',
         'start_x', 'start_y',
         'end_x', 'end_y',
-        'amp', 'peak_vel', 'avg_vel',
+        'amp', 'peak_vel', 'med_vel', 'avg_vel',
     ]
 
     def __init__(self,
@@ -222,7 +221,8 @@ class EyegazeClassifier(object):
         amp = (((data[0]['x'] - data[-1]['x']) ** 2 + \
                 (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * self.px2deg
         medvel = np.median(data['vel'])
-        return amp, pv, medvel
+        avgvel = np.mean(data['vel'])
+        return amp, pv, medvel, avgvel
 
     def get_adaptive_saccade_velocity_velthresh(self, vels):
         """Determine saccade peak velocity threshold.

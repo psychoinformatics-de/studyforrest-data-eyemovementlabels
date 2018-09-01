@@ -34,7 +34,7 @@ def test_target_data():
             ev_type = s['event_type']
             ev_start = i
         elif ev_type is not None and s['event_type'] != ev_type:
-            amp, pv, medvel = clf._get_signal_props(data[ev_start:i])
+            amp, pv, medvel, avgvel = clf._get_signal_props(data[ev_start:i])
             events.append(dict(
                 id=len(events),
                 label=label_remap.get(ev_type),

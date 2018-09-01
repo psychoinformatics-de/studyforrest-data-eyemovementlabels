@@ -180,7 +180,7 @@ class EyegazeClassifier(object):
                  px2deg,
                  sampling_rate,
                  velthresh_startvelocity=300.0,
-                 min_intersaccade_duration=0.1,
+                 min_intersaccade_duration=0.04,
                  min_saccade_duration=0.01,
                  max_initial_saccade_freq=2.0,
                  saccade_context_window_length=1.0,

@@ -174,6 +174,27 @@ def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     return mask
 
 
+def events2bids_events_tsv(events, fname, tsoffset=0.0):
+    common_headers = [
+        'label',
+        'start_x', 'start_y', 'end_x', 'end_y',
+        'amp',
+        'peak_vel', 'med_vel', 'avg_vel']
+    with open(fname, 'w') as fp:
+        fp.write('onset\tduration\t{}\n'.format(
+            '\t'.join(common_headers)))
+        for ev in sorted(events, key=lambda x: x['start_time']):
+            fp.write('{:.3f}\t{:.3f}\t{}\n'.format(
+                ev['start_time'] + tsoffset,
+                ev['end_time'] - ev['start_time'],
+                '\t'.join([
+                    ('{}' if k == 'label'
+                     else '{:.1f}' if k.endswith('_x') or k.endswith('_y')
+                     else '{:.3f}').format(ev[k])
+                    for k in common_headers
+                ])))
+
+
 class EyegazeClassifier(object):
 
     record_field_names = [

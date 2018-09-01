@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from . import utils as ut
 from .. import detect_events as d
@@ -72,15 +73,20 @@ def test_too_long_pso():
     assert list(events['label']) == ['FIXA', 'SACC', 'FIXA']
 
 
-def test_real_data():
+@pytest.mark.parametrize('infile', [
+    'inputs/raw_eyegaze/sub-32/beh/sub-32_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
+    'inputs/raw_eyegaze/sub-09/ses-movie/func/sub-09_ses-movie_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
+    'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
+])
+def test_real_data(infile):
     data = np.recfromcsv(
-        'inputs/raw_eyegaze/sub-09/ses-movie/func/sub-09_ses-movie_task-movie_run-2_recording-eyegaze_physio.tsv.gz',
-        #'inputs/raw_eyegaze/sub-02/ses-movie/func/sub-02_ses-movie_task-movie_run-5_recording-eyegaze_physio.tsv.gz',
+        infile,
         delimiter='\t',
         names=['x', 'y', 'pupil', 'frame'])
 
     clf = d.EyegazeClassifier(
-        px2deg=0.0185581232561,
+        #px2deg=0.0185581232561,
+        px2deg=0.0266711972026,
         sampling_rate=1000.0)
     p = clf.preproc(data)
 
@@ -89,20 +95,22 @@ def test_real_data():
         #p,
     )
 
-    events = ut.events2df(events)
+    evdf = ut.events2df(events)
 
-    labels = list(events['label'])
-    # find find all kinds of events
+    labels = list(evdf['label'])
+    # find all kinds of events
     for t in ('FIXA', 'PURS', 'SACC', 'LPSO', 'HPSO',
-              'ISAC', 'ILPS', 'IHPS'):
+              'ISAC', 'IHPS'):
+              # 'ILPS' one file doesn't have any
         assert t in labels
+    return
 
-    #ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
+    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
     #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
-    #import pylab as pl
-    #saccades = events[events['label'] == 'SACC']
-    #isaccades = events[events['label'] == 'ISAC']
-    #print('#saccades', len(saccades), len(isaccades))
-    #pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
-    #pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
-    #pl.show()
+    import pylab as pl
+    saccades = evdf[evdf['label'] == 'SACC']
+    isaccades = evdf[evdf['label'] == 'ISAC']
+    print('#saccades', len(saccades), len(isaccades))
+    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
+    pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
+    pl.show()

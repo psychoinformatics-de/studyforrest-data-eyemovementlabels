@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# -*- coding: iso-8859-15 -*-
+# -*- coding: utf-8 -*-
 import numpy as np
 from statsmodels.robust.scale import mad
 from scipy import signal
@@ -196,6 +196,14 @@ def events2bids_events_tsv(events, fname, tsoffset=0.0):
 
 
 class EyegazeClassifier(object):
+    """Robust eye movement event detection in natural viewing conditions
+
+    This algorithm is largely based on ideas taken from Nyström & Holmqvist
+    (2010, https://doi.org/10.3758/BRM.42.1.188) and Friedman et al. (2018,
+    https://doi.org/10.3758/s13428-018-1050-7), rearranged into a different
+    algorithm flow to be able to work more robustly on data recorded under
+    suboptimal conditions with dynamic stimuli (e.g. movies).
+    """
 
     record_field_names = [
         'id', 'label',
@@ -235,7 +243,6 @@ class EyegazeClassifier(object):
 
             self.max_sac_freq = max_initial_saccade_freq / sr
 
-    # TODO dissolve
     def _get_signal_props(self, data):
         data = data[~np.isnan(data['vel'])]
         pv = data['vel'].max()
@@ -683,8 +690,6 @@ class EyegazeClassifier(object):
         """
         Parameters
         ----------
-        data : array
-          Record array with fields ('x', 'y', 'pupil')
         px2deg : float
           Size of a pixel in visual angles.
         min_blink_duration : float
@@ -781,67 +786,40 @@ class EyegazeClassifier(object):
 
 
 if __name__ == '__main__':
-    fixation_velthresh = float(sys.argv[1])
-    px2deg = float(sys.argv[2])
-    infpath = sys.argv[3]
-    outfpath = sys.argv[4]
-    data = np.recfromcsv(
-        infpath,
-        delimiter='\t',
-        names=['vel', 'accel', 'x', 'y'])
+    import argparse
+    import inspect
 
-    events = detect(data, outfpath, fixation_velthresh, px2deg)
+    kwargs = {}
+    for func in (EyegazeClassifier.__init__, EyegazeClassifier.preproc):
+        # pull kwargs and their defaults out of the function definitions
+        argspec = inspect.getargspec(func)
+        kwargs.update(zip(argspec.args[::-1], argspec.defaults[::-1]))
 
-    # TODO think about just saving it in binary form
-    f = gzip.open(outfpath, "w")
-    for e in events:
-        f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+    parser = argparse.ArgumentParser(
+        description='{}\nPreprocessing\n=============\n{}'.format(
+            EyegazeClassifier.__doc__,
+            EyegazeClassifier.preproc.__doc__,
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        'px2deg', type=float, metavar='<PX2DEG>',
+        help="""Factor to convert pixel coordinates to visual degrees, i.e.
+        the visual angle of a single pixel. Pixels are assumed to be square.
+        This will typically be a rather small value.""")
+    parser.add_argument(
+        'sr', type=float, metavar='<SAMPLING RATE>',
+        help="""Sampling rate of the data in Hertz. Only data with dense
+        regular sampling are supported.""")
 
+    for argname, default in sorted(kwargs.items(), key=lambda x: x[0]):
+        parser.add_argument(
+            '--{}'.format(argname.replace('_', '-')),
+            dest=argname,
+            metavar='<float>' if argname != 'savgol-polyord' else '<int>',
+            type=float if argname != 'savgol-polyord' else int,
+            default=default,
+            help='default: {}'.format(default))
 
-
-
-
-
-#Selection criterion for IVT threshold
-
-#@inproceedings{Olsen:2012:IPV:2168556.2168625,
-#author = {Olsen, Anneli and Matos, Ricardo},
-#title = {Identifying Parameter Values for an I-VT Fixation Filter Suitable for Handling Data Sampled with Various Sampling Frequencies},
-# booktitle = {Proceedings of the Symposium on Eye Tracking Research and Applications},
-#series = {ETRA '12},
-#year = {2012},
-#isbn = {978-1-4503-1221-9},
-#location = {Santa Barbara, California},
-#pages = {317--320},
-#numpages = {4},
-#url = {http://doi.acm.org/10.1145/2168556.2168625},
-#doi = {10.1145/2168556.2168625},
-#acmid = {2168625},
-#publisher = {ACM},
-#address = {New York, NY, USA},
-#keywords = {algorithm, classification, eye movements, scoring},
-#} 
-
-#Human-Computer Interaction: Psychonomic Aspects
-#edited by Gerrit C. van der Veer, Gijsbertus Mulder
-#pg 58-59
-
-#Eye Tracking: A comprehensive guide to methods and measures: Rotting (2001)
-#By Kenneth Holmqvist, Marcus Nystrom, Richard Andersson, Richard Dewhurst, Halszka Jarodzka, Joost van de Weijer
-
-#A good reveiw along with a great chunk of the content found in this code:
-#@Article{Nystr├Âm2010,
-#author="Nystr{\"o}m, Marcus
-#and Holmqvist, Kenneth",
-#title="An adaptive algorithm for fixation, saccade, and glissade detection in eyetracking data",
-#journal="Behavior Research Methods",
-#year="2010",
-#month="Feb",
-#day="01",
-#volume="42",
-#number="1",
-#pages="188--204",
-#abstract="Event detection is used to classify recorded gaze points into periods of fixation, saccade, smooth pursuit, blink, and noise. Although there is an overall consensus that current algorithms for event detection have serious flaws and that a de facto standard for event detection does not exist, surprisingly little work has been done to remedy this problem. We suggest a new velocity-based algorithm that takes several of the previously known limitations into account. Most important, the new algorithm identifies so-called glissades, a wobbling movement at the end of many saccades, as a separate class of eye movements. Part of the solution involves designing an adaptive velocity threshold that makes the event detection less sensitive to variations in noise level and the algorithm settings-free for the user. We demonstrate the performance of the new algorithm on eye movements recorded during reading and scene perception and compare it with two of the most commonly used algorithms today. Results show that, unlike the currently used algorithms, fixations, saccades, and glissades are robustly identified by the new algorithm. Using this algorithm, we found that glissades occur in about half of the saccades, during both reading and scene perception, and that they have an average duration close to 24 msec. Due to the high prevalence and long durations of glissades, we argue that researchers must actively choose whether to assign the glissades to saccades or fixations; the choice affects dependent variables such as fixation and saccade duration significantly. Current algorithms do not offer this choice, and their assignments of each glissade are largely arbitrary.",
-#issn="1554-3528",
-#doi="10.3758/BRM.42.1.188",
-#url="https://doi.org/10.3758/BRM.42.1.188"
+    args = parser.parse_args()
+    print(args)

@@ -690,26 +690,23 @@ class EyegazeClassifier(object):
         """
         Parameters
         ----------
-        px2deg : float
-          Size of a pixel in visual angles.
         min_blink_duration : float
           In seconds. Any signal loss shorter than this duration with not be
           considered for `dilate_blink`.
-        dilate_blink : float
+        dilate_nan : float
           Duration by which to dilate a blink window (missing data segment) on
           either side (in seconds).
-        median_filter_width : float
+        median_filter_length : float
           Filter window length in seconds.
         savgol_length : float
           Filter window length in seconds.
         savgol_polyord : int
           Filter polynomial order used to fit the samples.
-        sampling_rate : float
-          In Hertz
         max_vel : float
-          Maximum velocity in deg/s. Any velocity value larger than this threshold
-          will be replaced by the previous velocity value. Additionally a warning
-          will be issued to indicate a potentially inappropriate filter setup.
+          Maximum velocity in deg/s. Any velocity value larger than this
+          threshold will be replaced by the previous velocity value.
+          Additionally a warning will be issued to indicate a potentially
+          inappropriate filter setup.
         """
         # convert params in seconds to #samples
         dilate_nan = int(dilate_nan * self.sr)
@@ -724,6 +721,7 @@ class EyegazeClassifier(object):
         # dilate_nan at either end
         # find clusters of "no data"
         if dilate_nan:
+            lgr.info('Dilate NaN segments by %i samples', dilate_nan)
             mask = get_dilated_nan_mask(
                 data['x'],
                 dilate_nan,
@@ -732,6 +730,9 @@ class EyegazeClassifier(object):
             data['y'][mask] = np.nan
 
         if savgol_length:
+            lgr.info(
+                'Smooth coordinates with Savitzy-Golay filter (len=%i, ord=%i)',
+                savgol_length, savgol_polyord)
             for i in ('x', 'y'):
                 data[i] = savgol_filter(data[i], savgol_length, savgol_polyord)
 
@@ -743,6 +744,9 @@ class EyegazeClassifier(object):
         velocities *= self.px2deg * self.sr
 
         if median_filter_length:
+            lgr.info(
+                'Add velocities computed from median-filtered (len=%i) '
+                'coordinates', median_filter_length)
             med_velocities = np.zeros((len(data),), velocities.dtype)
             med_velocities[1:] = (
                 np.diff(median_filter(data['x'],
@@ -803,12 +807,22 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        'infile', metavar='<datafile>',
+        help="""Data file with eye gaze recordings to process. The first two
+        column in this file must contain x and y coordinates, while each line
+        is a timepoint (no header). The file is read with NumPy's recfromcsv
+        and may be compressed.""")
+    parser.add_argument(
+        'outfile', metavar='<eventfile>',
+        help="""Output file name. This file will contain information on all
+        detected eye movement events in BIDS events.tsv format.""")
+    parser.add_argument(
         'px2deg', type=float, metavar='<PX2DEG>',
         help="""Factor to convert pixel coordinates to visual degrees, i.e.
         the visual angle of a single pixel. Pixels are assumed to be square.
         This will typically be a rather small value.""")
     parser.add_argument(
-        'sr', type=float, metavar='<SAMPLING RATE>',
+        'sampling_rate', type=float, metavar='<SAMPLING RATE>',
         help="""Sampling rate of the data in Hertz. Only data with dense
         regular sampling are supported.""")
 
@@ -822,4 +836,31 @@ if __name__ == '__main__':
             help='default: {}'.format(default))
 
     args = parser.parse_args()
-    print(args)
+
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+
+    data = np.recfromcsv(
+        args.infile,
+        delimiter='\t',
+        names=['x', 'y'],
+        usecols=[0, 1])
+    lgr.info('Read %i samples', len(data))
+
+    clf = EyegazeClassifier(
+        **{k: getattr(args, k) for k in (
+            'px2deg', 'sampling_rate', 'velthresh_startvelocity',
+            'min_intersaccade_duration', 'min_saccade_duration',
+            'max_initial_saccade_freq', 'saccade_context_window_length',
+            'max_pso_duration', 'min_fixation_duration', 'max_fixation_amp')}
+    )
+
+    pp = clf.preproc(
+        data,
+        **{k: getattr(args, k) for k in (
+            'min_blink_duration', 'dilate_nan', 'median_filter_length',
+            'savgol_length', 'savgol_polyord', 'max_vel')}
+    )
+
+    events = clf(pp, classify_isp=True, sort_events=True)
+
+    events2bids_events_tsv(events, args.outfile)

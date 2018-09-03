@@ -560,7 +560,8 @@ class EyegazeClassifier(object):
         # split the ISP up into its non-NaN pieces:
         win_start = None
         for idx in range(start, end + 1):
-            if win_start is None and not np.isnan(data['x'][idx]):
+            if win_start is None and \
+                    idx < len(data) and not np.isnan(data['x'][idx]):
                 win_start = idx
             elif win_start is not None and \
                     ((idx == end) or np.isnan(data['x'][idx])):

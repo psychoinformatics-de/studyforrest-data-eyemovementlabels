@@ -489,7 +489,7 @@ class EyegazeClassifier(object):
             saccade_events,
             saccade_detection):
 
-        lgr.warn(
+        lgr.info(
             'Determine ISPs %i, %i (%i saccade-related events)',
             start, end, len(saccade_events))
 
@@ -522,7 +522,7 @@ class EyegazeClassifier(object):
                 prev_pso = None
                 continue
 
-            lgr.warn('Found ISP [%i:%i]', win_start, win_end)
+            lgr.info('Found ISP [%i:%i]', win_start, win_end)
             for e in self._classify_intersaccade_period(
                     data,
                     win_start,
@@ -554,7 +554,7 @@ class EyegazeClassifier(object):
             start,
             end,
             saccade_detection):
-        lgr.warn('Determine NaN-free intervals in [%i:%i] (%i)',
+        lgr.info('Determine NaN-free intervals in [%i:%i] (%i)',
                  start, end, end - start)
 
         # split the ISP up into its non-NaN pieces:
@@ -580,7 +580,7 @@ class EyegazeClassifier(object):
             end,
             saccade_detection):
         # no NaN values in data at this point!
-        lgr.warn(
+        lgr.info(
             'Process non-NaN segment [%i, %i] -> %i',
             start, end, end - start)
 
@@ -596,7 +596,7 @@ class EyegazeClassifier(object):
         if length > (
                 2 * self.min_intersac_dur) \
                 + self.min_sac_dur + self.max_pso_dur:
-            lgr.warn('Perform saccade detection in [%i:%i]', start, end)
+            lgr.info('Perform saccade detection in [%i:%i]', start, end)
             saccades = self._detect_saccades(
                 None,
                 data,
@@ -622,7 +622,7 @@ class EyegazeClassifier(object):
                     yield s.copy()
                     saccade_events.append(s)
             if saccade_events:
-                lgr.warn('Found additional saccades in ISP')
+                lgr.info('Found additional saccades in ISP')
                 # and now process the intervals between the saccades
                 for e in self._classify_intersaccade_periods(
                         data,
@@ -825,6 +825,12 @@ if __name__ == '__main__':
         'sampling_rate', type=float, metavar='<SAMPLING RATE>',
         help="""Sampling rate of the data in Hertz. Only data with dense
         regular sampling are supported.""")
+    parser.add_argument(
+        '--log-level', choices=('debug', 'info', 'warn', 'error'),
+        metavar='level', default='warn',
+        help="""debug|info|warn|error. 'info' and 'debug' levels enable output
+        of increasing levels of detail on the algorithm steps and decision
+        making. Default: warn""")
 
     for argname, default in sorted(kwargs.items(), key=lambda x: x[0]):
         parser.add_argument(
@@ -837,7 +843,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(
+        format='%(levelname)s:%(message)s',
+        level=getattr(logging, args.log_level.upper()))
 
     data = np.recfromcsv(
         args.infile,

@@ -876,3 +876,32 @@ if __name__ == '__main__':
     events = clf(pp, classify_isp=True, sort_events=True)
 
     events2bids_events_tsv(events, args.outfile)
+
+    import pylab as pl
+    import pandas as pd
+    events = pd.DataFrame(events)
+
+    saccades = events[events['label'] == 'SACC']
+    isaccades = events[events['label'] == 'ISAC']
+    hvpso = events[(events['label'] == 'HPSO') | (events['label'] == 'IHPS')]
+    lvpso = events[(events['label'] == 'LPSO') | (events['label'] == 'ILPS')]
+
+    pl.figure(figsize=(6,4))
+    for ev, sym, color, label in (
+            (saccades, '.', 'black', 'saccades'),
+            (isaccades, '.', 'xkcd:green teal', '"minor" saccades'),
+            (hvpso, '+', 'xkcd:burnt sienna', 'fast PSOs'),
+            (lvpso, '+', 'xkcd:azure', 'slow PSOs'))[::-1]:
+        pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
+                  alpha=.2, lw=1, label=label)
+
+    pl.ylim((10.0, args.max_vel))
+    pl.xlim((0.01, 40.0))
+    pl.legend(loc=4)
+    pl.ylabel('peak velocities (deg/s)')
+    pl.xlabel('amplitude (deg)')
+    pl.savefig(
+        '{}_mainseq.png'.format(
+            args.outfile[:-4] if args.outfile.endswith('.tsv')
+            else args.outfile),
+        bbox_inches='tight', format='png')

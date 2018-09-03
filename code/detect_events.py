@@ -877,6 +877,8 @@ if __name__ == '__main__':
 
     events2bids_events_tsv(events, args.outfile)
 
+    import matplotlib
+    matplotlib.use('agg')
     import pylab as pl
     import pandas as pd
     events = pd.DataFrame(events)

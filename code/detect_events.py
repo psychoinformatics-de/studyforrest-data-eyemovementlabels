@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# -*- coding: iso-8859-15 -*-
+# -*- coding: utf-8 -*-
 import numpy as np
 from statsmodels.robust.scale import mad
 from scipy import signal
@@ -174,15 +174,43 @@ def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     return mask
 
 
+def events2bids_events_tsv(events, fname, tsoffset=0.0):
+    common_headers = [
+        'label',
+        'start_x', 'start_y', 'end_x', 'end_y',
+        'amp',
+        'peak_vel', 'med_vel', 'avg_vel']
+    with open(fname, 'w') as fp:
+        fp.write('onset\tduration\t{}\n'.format(
+            '\t'.join(common_headers)))
+        for ev in sorted(events, key=lambda x: x['start_time']):
+            fp.write('{:.3f}\t{:.3f}\t{}\n'.format(
+                ev['start_time'] + tsoffset,
+                ev['end_time'] - ev['start_time'],
+                '\t'.join([
+                    ('{}' if k == 'label'
+                     else '{:.1f}' if k.endswith('_x') or k.endswith('_y')
+                     else '{:.3f}').format(ev[k])
+                    for k in common_headers
+                ])))
+
 
 class EyegazeClassifier(object):
+    """Robust eye movement event detection in natural viewing conditions
+
+    This algorithm is largely based on ideas taken from Nyström & Holmqvist
+    (2010, https://doi.org/10.3758/BRM.42.1.188) and Friedman et al. (2018,
+    https://doi.org/10.3758/s13428-018-1050-7), rearranged into a different
+    algorithm flow to be able to work more robustly on data recorded under
+    suboptimal conditions with dynamic stimuli (e.g. movies).
+    """
 
     record_field_names = [
         'id', 'label',
         'start_time', 'end_time',
         'start_x', 'start_y',
         'end_x', 'end_y',
-        'amp', 'peak_vel', 'avg_vel',
+        'amp', 'peak_vel', 'med_vel', 'avg_vel',
     ]
 
     def __init__(self,
@@ -215,14 +243,14 @@ class EyegazeClassifier(object):
 
             self.max_sac_freq = max_initial_saccade_freq / sr
 
-    # TODO dissolve
     def _get_signal_props(self, data):
         data = data[~np.isnan(data['vel'])]
         pv = data['vel'].max()
         amp = (((data[0]['x'] - data[-1]['x']) ** 2 + \
                 (data[0]['y'] - data[-1]['y']) ** 2) ** 0.5) * self.px2deg
         medvel = np.median(data['vel'])
-        return amp, pv, medvel
+        avgvel = np.mean(data['vel'])
+        return amp, pv, medvel, avgvel
 
     def get_adaptive_saccade_velocity_velthresh(self, vels):
         """Determine saccade peak velocity threshold.
@@ -461,7 +489,7 @@ class EyegazeClassifier(object):
             saccade_events,
             saccade_detection):
 
-        lgr.warn(
+        lgr.info(
             'Determine ISPs %i, %i (%i saccade-related events)',
             start, end, len(saccade_events))
 
@@ -494,7 +522,7 @@ class EyegazeClassifier(object):
                 prev_pso = None
                 continue
 
-            lgr.warn('Found ISP [%i:%i]', win_start, win_end)
+            lgr.info('Found ISP [%i:%i]', win_start, win_end)
             for e in self._classify_intersaccade_period(
                     data,
                     win_start,
@@ -526,7 +554,7 @@ class EyegazeClassifier(object):
             start,
             end,
             saccade_detection):
-        lgr.warn('Determine NaN-free intervals in [%i:%i] (%i)',
+        lgr.info('Determine NaN-free intervals in [%i:%i] (%i)',
                  start, end, end - start)
 
         # split the ISP up into its non-NaN pieces:
@@ -552,7 +580,7 @@ class EyegazeClassifier(object):
             end,
             saccade_detection):
         # no NaN values in data at this point!
-        lgr.warn(
+        lgr.info(
             'Process non-NaN segment [%i, %i] -> %i',
             start, end, end - start)
 
@@ -568,7 +596,7 @@ class EyegazeClassifier(object):
         if length > (
                 2 * self.min_intersac_dur) \
                 + self.min_sac_dur + self.max_pso_dur:
-            lgr.warn('Perform saccade detection in [%i:%i]', start, end)
+            lgr.info('Perform saccade detection in [%i:%i]', start, end)
             saccades = self._detect_saccades(
                 None,
                 data,
@@ -594,7 +622,7 @@ class EyegazeClassifier(object):
                     yield s.copy()
                     saccade_events.append(s)
             if saccade_events:
-                lgr.warn('Found additional saccades in ISP')
+                lgr.info('Found additional saccades in ISP')
                 # and now process the intervals between the saccades
                 for e in self._classify_intersaccade_periods(
                         data,
@@ -662,28 +690,23 @@ class EyegazeClassifier(object):
         """
         Parameters
         ----------
-        data : array
-          Record array with fields ('x', 'y', 'pupil')
-        px2deg : float
-          Size of a pixel in visual angles.
         min_blink_duration : float
           In seconds. Any signal loss shorter than this duration with not be
           considered for `dilate_blink`.
-        dilate_blink : float
+        dilate_nan : float
           Duration by which to dilate a blink window (missing data segment) on
           either side (in seconds).
-        median_filter_width : float
+        median_filter_length : float
           Filter window length in seconds.
         savgol_length : float
           Filter window length in seconds.
         savgol_polyord : int
           Filter polynomial order used to fit the samples.
-        sampling_rate : float
-          In Hertz
         max_vel : float
-          Maximum velocity in deg/s. Any velocity value larger than this threshold
-          will be replaced by the previous velocity value. Additionally a warning
-          will be issued to indicate a potentially inappropriate filter setup.
+          Maximum velocity in deg/s. Any velocity value larger than this
+          threshold will be replaced by the previous velocity value.
+          Additionally a warning will be issued to indicate a potentially
+          inappropriate filter setup.
         """
         # convert params in seconds to #samples
         dilate_nan = int(dilate_nan * self.sr)
@@ -698,6 +721,7 @@ class EyegazeClassifier(object):
         # dilate_nan at either end
         # find clusters of "no data"
         if dilate_nan:
+            lgr.info('Dilate NaN segments by %i samples', dilate_nan)
             mask = get_dilated_nan_mask(
                 data['x'],
                 dilate_nan,
@@ -706,6 +730,9 @@ class EyegazeClassifier(object):
             data['y'][mask] = np.nan
 
         if savgol_length:
+            lgr.info(
+                'Smooth coordinates with Savitzy-Golay filter (len=%i, ord=%i)',
+                savgol_length, savgol_polyord)
             for i in ('x', 'y'):
                 data[i] = savgol_filter(data[i], savgol_length, savgol_polyord)
 
@@ -717,6 +744,9 @@ class EyegazeClassifier(object):
         velocities *= self.px2deg * self.sr
 
         if median_filter_length:
+            lgr.info(
+                'Add velocities computed from median-filtered (len=%i) '
+                'coordinates', median_filter_length)
             med_velocities = np.zeros((len(data),), velocities.dtype)
             med_velocities[1:] = (
                 np.diff(median_filter(data['x'],
@@ -760,67 +790,85 @@ class EyegazeClassifier(object):
 
 
 if __name__ == '__main__':
-    fixation_velthresh = float(sys.argv[1])
-    px2deg = float(sys.argv[2])
-    infpath = sys.argv[3]
-    outfpath = sys.argv[4]
+    import argparse
+    import inspect
+
+    kwargs = {}
+    for func in (EyegazeClassifier.__init__, EyegazeClassifier.preproc):
+        # pull kwargs and their defaults out of the function definitions
+        argspec = inspect.getargspec(func)
+        kwargs.update(zip(argspec.args[::-1], argspec.defaults[::-1]))
+
+    parser = argparse.ArgumentParser(
+        description='{}\nPreprocessing\n=============\n{}'.format(
+            EyegazeClassifier.__doc__,
+            EyegazeClassifier.preproc.__doc__,
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        'infile', metavar='<datafile>',
+        help="""Data file with eye gaze recordings to process. The first two
+        column in this file must contain x and y coordinates, while each line
+        is a timepoint (no header). The file is read with NumPy's recfromcsv
+        and may be compressed.""")
+    parser.add_argument(
+        'outfile', metavar='<eventfile>',
+        help="""Output file name. This file will contain information on all
+        detected eye movement events in BIDS events.tsv format.""")
+    parser.add_argument(
+        'px2deg', type=float, metavar='<PX2DEG>',
+        help="""Factor to convert pixel coordinates to visual degrees, i.e.
+        the visual angle of a single pixel. Pixels are assumed to be square.
+        This will typically be a rather small value.""")
+    parser.add_argument(
+        'sampling_rate', type=float, metavar='<SAMPLING RATE>',
+        help="""Sampling rate of the data in Hertz. Only data with dense
+        regular sampling are supported.""")
+    parser.add_argument(
+        '--log-level', choices=('debug', 'info', 'warn', 'error'),
+        metavar='level', default='warn',
+        help="""debug|info|warn|error. 'info' and 'debug' levels enable output
+        of increasing levels of detail on the algorithm steps and decision
+        making. Default: warn""")
+
+    for argname, default in sorted(kwargs.items(), key=lambda x: x[0]):
+        parser.add_argument(
+            '--{}'.format(argname.replace('_', '-')),
+            dest=argname,
+            metavar='<float>' if argname != 'savgol-polyord' else '<int>',
+            type=float if argname != 'savgol-polyord' else int,
+            default=default,
+            help='default: {}'.format(default))
+
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        format='%(levelname)s:%(message)s',
+        level=getattr(logging, args.log_level.upper()))
+
     data = np.recfromcsv(
-        infpath,
+        args.infile,
         delimiter='\t',
-        names=['vel', 'accel', 'x', 'y'])
+        names=['x', 'y'],
+        usecols=[0, 1])
+    lgr.info('Read %i samples', len(data))
 
-    events = detect(data, outfpath, fixation_velthresh, px2deg)
+    clf = EyegazeClassifier(
+        **{k: getattr(args, k) for k in (
+            'px2deg', 'sampling_rate', 'velthresh_startvelocity',
+            'min_intersaccade_duration', 'min_saccade_duration',
+            'max_initial_saccade_freq', 'saccade_context_window_length',
+            'max_pso_duration', 'min_fixation_duration', 'max_fixation_amp')}
+    )
 
-    # TODO think about just saving it in binary form
-    f = gzip.open(outfpath, "w")
-    for e in events:
-        f.write('%s\t%i\t%i\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n' % e)
+    pp = clf.preproc(
+        data,
+        **{k: getattr(args, k) for k in (
+            'min_blink_duration', 'dilate_nan', 'median_filter_length',
+            'savgol_length', 'savgol_polyord', 'max_vel')}
+    )
 
+    events = clf(pp, classify_isp=True, sort_events=True)
 
-
-
-
-
-#Selection criterion for IVT threshold
-
-#@inproceedings{Olsen:2012:IPV:2168556.2168625,
-#author = {Olsen, Anneli and Matos, Ricardo},
-#title = {Identifying Parameter Values for an I-VT Fixation Filter Suitable for Handling Data Sampled with Various Sampling Frequencies},
-# booktitle = {Proceedings of the Symposium on Eye Tracking Research and Applications},
-#series = {ETRA '12},
-#year = {2012},
-#isbn = {978-1-4503-1221-9},
-#location = {Santa Barbara, California},
-#pages = {317--320},
-#numpages = {4},
-#url = {http://doi.acm.org/10.1145/2168556.2168625},
-#doi = {10.1145/2168556.2168625},
-#acmid = {2168625},
-#publisher = {ACM},
-#address = {New York, NY, USA},
-#keywords = {algorithm, classification, eye movements, scoring},
-#} 
-
-#Human-Computer Interaction: Psychonomic Aspects
-#edited by Gerrit C. van der Veer, Gijsbertus Mulder
-#pg 58-59
-
-#Eye Tracking: A comprehensive guide to methods and measures: Rotting (2001)
-#By Kenneth Holmqvist, Marcus Nystrom, Richard Andersson, Richard Dewhurst, Halszka Jarodzka, Joost van de Weijer
-
-#A good reveiw along with a great chunk of the content found in this code:
-#@Article{Nystr├Âm2010,
-#author="Nystr{\"o}m, Marcus
-#and Holmqvist, Kenneth",
-#title="An adaptive algorithm for fixation, saccade, and glissade detection in eyetracking data",
-#journal="Behavior Research Methods",
-#year="2010",
-#month="Feb",
-#day="01",
-#volume="42",
-#number="1",
-#pages="188--204",
-#abstract="Event detection is used to classify recorded gaze points into periods of fixation, saccade, smooth pursuit, blink, and noise. Although there is an overall consensus that current algorithms for event detection have serious flaws and that a de facto standard for event detection does not exist, surprisingly little work has been done to remedy this problem. We suggest a new velocity-based algorithm that takes several of the previously known limitations into account. Most important, the new algorithm identifies so-called glissades, a wobbling movement at the end of many saccades, as a separate class of eye movements. Part of the solution involves designing an adaptive velocity threshold that makes the event detection less sensitive to variations in noise level and the algorithm settings-free for the user. We demonstrate the performance of the new algorithm on eye movements recorded during reading and scene perception and compare it with two of the most commonly used algorithms today. Results show that, unlike the currently used algorithms, fixations, saccades, and glissades are robustly identified by the new algorithm. Using this algorithm, we found that glissades occur in about half of the saccades, during both reading and scene perception, and that they have an average duration close to 24 msec. Due to the high prevalence and long durations of glissades, we argue that researchers must actively choose whether to assign the glissades to saccades or fixations; the choice affects dependent variables such as fixation and saccade duration significantly. Current algorithms do not offer this choice, and their assignments of each glissade are largely arbitrary.",
-#issn="1554-3528",
-#doi="10.3758/BRM.42.1.188",
-#url="https://doi.org/10.3758/BRM.42.1.188"
+    events2bids_events_tsv(events, args.outfile)

@@ -33,7 +33,7 @@ def test_no_saccade():
     assert len(clf(p)) == len(events)
 
 
-def test_one_saccade():
+def test_one_saccade(tmpdir):
     samp = ut.mk_gaze_sample()
 
     data = ut.expand_samp(samp, y=0.0)
@@ -42,15 +42,23 @@ def test_one_saccade():
     events = clf(p)
     assert events is not None
     # we find at least the saccade
-    events = ut.events2df(events)
     assert len(events) > 2
     if len(events) == 4:
         # full set
-        assert list(events['label']) == ['FIXA', 'ISAC', 'ILPS', 'FIXA'] or \
-            list(events['label']) == ['FIXA', 'ISAC', 'IHPS', 'FIXA']
-        for i in range(0, len(events) - 1):
+        evdf = ut.events2df(events)
+        assert list(evdf['label']) == ['FIXA', 'ISAC', 'ILPS', 'FIXA'] or \
+            list(evdf['label']) == ['FIXA', 'ISAC', 'IHPS', 'FIXA']
+        for i in range(0, len(evdf) - 1):
             # complete segmentation
-            assert events['start_time'][i + 1] == events['end_time'][i]
+            assert evdf['start_time'][i + 1] == evdf['end_time'][i]
+    outfname = tmpdir.mkdir('bids').join("events.tsv").strpath
+    d.events2bids_events_tsv(events, outfname)
+    fcontent = open(outfname, 'r').readlines()
+    assert len(fcontent) == len(events) + 1, 'header plus one event per line'
+    assert fcontent[0].startswith('onset\tduration'), 'minimum BIDS headers'
+    start_times = [float(line.split('\t')[0]) for line in fcontent[1:]]
+    assert start_times == sorted(start_times), \
+        'events in file are sorted by start time'
 
 
 def test_too_long_pso():

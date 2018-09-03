@@ -123,6 +123,9 @@ def find_psoend(velocities, sac_velthresh, sac_peak_velthresh):
         pso_end = find_movement_offsetidx(
             velocities, pso_peaks[-1][1], sac_velthresh)
 
+        if np.isnan(velocities[:pso_end]).sum():
+            # we do not tolerate NaNs in PSO itervals
+            return
         if pso_end > len(velocities):
             # velocities did not go down within the given window
             return

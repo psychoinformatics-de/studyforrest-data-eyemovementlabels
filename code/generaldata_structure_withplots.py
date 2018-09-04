@@ -25,12 +25,11 @@ dictofsamples = {}
 
 for subject in list:
 
-	allFiles = glob.glob(subject+"/events_run*.gz")
+	allFiles = glob.glob(subject+"/*.tsv")
 	frame = pd.DataFrame()
 	
 	for run in allFiles:
-		df = pd.read_csv(run,index_col=None, header=None,delim_whitespace=True)
-		df.columns = ["type","t_start","t_end","x_start","y_start","x_end","y_end","amplitude","peak_vel","avg_velocity","duration"]
+		df = pd.read_csv(run,index_col=None, header=0,delim_whitespace=True)
 		dictofsamples["{0}".format(run)]= df
 		
 		
@@ -52,7 +51,7 @@ for i in listfor5_1:
 # Extracting lines only that contrain type "SACCADE"
 
 # Make a boolean series if SACCADE or not
-saccades = allsubsrun.type == "SACCADE"
+saccades = allsubsrun.label == "SACC"
 
 # Seeking out only saccades from the dataset
 saccadesonly = allsubsrun[saccades]
@@ -60,8 +59,8 @@ saccadesonly = allsubsrun[saccades]
 # Plotting
 plt.figure()
 saccadegraph = sns.distplot(saccadesonly.duration,kde=False,norm_hist=True,bins=100)
-plt.xlim(0, 150)
-plt.ylim(0, 0.07)
+#plt.xlim(0, 150)
+#plt.ylim(0, 0.07)
 saccadegraph.set(xlabel='Saccade Duration in ms')
 plt.title('Saccade durations over all subjects')
 plt.draw()
@@ -69,35 +68,37 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-09/events_run-4.tsv.gz'] # currently manually replacing with random subject (9) in MRI
-a2saccades = subject24_4.type == "SACCADE"
+subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+a2saccades = subject24_4.label == "SACC"
 
 a2saccadesonly = subject24_4[a2saccades] 
 
-# Plotting
-velampgraph = sns.regplot(a2saccadesonly.amplitude,a2saccadesonly.peak_vel,fit_reg = False,scatter_kws={"s": 1})
+# Plotting 
+velampgraph = sns.regplot(a2saccadesonly.amp,a2saccadesonly.peak_vel,fit_reg = False,scatter_kws={"s": 20})
+#velampgraph = sns.scatterplot(x= "amp", y="peak_vel", data = a2saccadesonly) No idea why this doesn't work
 plt.title('Relationship between peak velocity and amplitude (subject 24)')
 velampgraph.set(xlabel='Amplitude', ylabel= 'Peak Velocity')
-# Inserting a fit for the scatter plot, degree = 5
-p = Polynomial.fit(a2saccadesonly.amplitude,a2saccadesonly.peak_vel,5)
+
+# Inserting a fit for the scatter plot, degree = 1
+p = Polynomial.fit(a2saccadesonly.amp,a2saccadesonly.peak_vel,1)
 plt.plot(*p.linspace())
 plt.draw()
 
 ### Figure A3 All saccade amplitudes
 
 plt.figure()
-saccadeampgraph = sns.distplot(saccadesonly.amplitude,kde=False,norm_hist=True,bins=150)
+saccadeampgraph = sns.distplot(saccadesonly.amp,kde=False,norm_hist=True,bins=50)
 saccadeampgraph.set(xlabel='Saccade Amplitude in deg')
-plt.xlim(0, 16)
+#plt.xlim(0, 16)
 plt.title('Saccade amplitudes over all subjects')
 plt.draw()
 
 ### Figure A4 All saccade peak velocities
 
 plt.figure()
-saccadepvgraph = sns.distplot(saccadesonly.peak_vel,kde=False,norm_hist=True, bins  = 100)
+saccadepvgraph = sns.distplot(saccadesonly.peak_vel,kde=False,norm_hist=True, bins  = 50)
 saccadepvgraph.set(xlabel='Saccade peak velocity in deg/s')
-plt.xlim(0, 800)
+#plt.xlim(0, 800)
 saccadepvgraph.xaxis.set_major_locator(ticker.MultipleLocator(50))
 saccadepvgraph.xaxis.set_major_formatter(ticker.ScalarFormatter())
 plt.title('Saccade peak velocities over all subjects')
@@ -107,10 +108,10 @@ plt.draw()
 
 plt.figure()
 product = a2saccadesonly.duration * a2saccadesonly.peak_vel
-productgraph = sns.regplot(a2saccadesonly.amplitude, product,fit_reg = True,scatter_kws={"s": 1}, line_kws={"color":"r","lw":1})
+productgraph = sns.regplot(a2saccadesonly.amp, product,fit_reg = True,scatter_kws={"s": 1}, line_kws={"color":"r","lw":1})
 productgraph.set(ylabel='Product of peak velocity and duration', xlabel = 'Amplitude in deg')
-plt.xlim(0, 20)
-plt.ylim(0, 30000)
+#plt.xlim(0, 20)
+#plt.ylim(0, 30000)
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
 plt.draw()
 
@@ -137,10 +138,10 @@ def findvalues (segment):
 	
 	"""
 	
-	saccades = segmentlist['segment'+str(segment)].type == "SACCADE"
+	saccades = segmentlist['segment'+str(segment)].type == "SACC"
 	saccadesonly = segmentlist['segment'+str(segment)][saccades]
-	dur_mean,amp_mean,peak_velmean =  saccadesonly.duration.mean(), saccadesonly.amplitude.mean(),saccadesonly.peak_vel.mean()
-	dur_std,amp_std,peak_velstd =  saccadesonly.duration.std(), saccadesonly.amplitude.std(),saccadesonly.peak_vel.std()
+	dur_mean,amp_mean,peak_velmean =  saccadesonly.duration.mean(), saccadesonly.amp.mean(),saccadesonly.peak_vel.mean()
+	dur_std,amp_std,peak_velstd =  saccadesonly.duration.std(), saccadesonly.amp.std(),saccadesonly.peak_vel.std()
 	df = pd.DataFrame ({'#' : ['{0}'.format(segment)],'Duration' : ["{0:.2f} ± {1:.2f}".format(dur_mean,dur_std)], 'Amplitude' : ["{0:.2f} ± {1:.2f}".format(amp_mean,amp_std)], 'Peak Velocity' : ["{0:.2f} ± {1:.2f}".format(peak_velmean,peak_velstd)]})
 	
 	return df
@@ -154,7 +155,7 @@ def saccadecount(run_number):
 	
 	for i in dictofsamples.keys():
 		if ("run-"+str(run_number)) in i:
-			saccades = dictofsamples[i].type == "SACCADE"
+			saccades = dictofsamples[i].type == "SACC"
 			saccadecount = np.sum(saccades)
 			list.append(saccadecount)
 			
@@ -202,7 +203,7 @@ def findvaluesG (segment):
 	
 	gliccades = segmentlist['segment'+str(segment)].type == "GLISSADE"
 	gliccadesonly = segmentlist['segment'+str(segment)][gliccades]
-	dur_mean,amp_mean =  gliccadesonly.duration.mean(), gliccadesonly.amplitude.mean()
+	dur_mean,amp_mean =  gliccadesonly.duration.mean(), gliccadesonly.amp.mean()
 	df = pd.DataFrame ({'#' : ['{0}'.format(segment)],'Duration' : ["{0:.2f}".format(dur_mean)], 'Amplitude' : ["{0:.2f}".format(amp_mean)]})
 	
 	return df

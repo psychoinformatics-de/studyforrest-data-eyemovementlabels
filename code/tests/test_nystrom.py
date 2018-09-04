@@ -49,10 +49,9 @@ def test_target_data():
             ev_start = i
         if ev_type:
             vels.append(s['vel'])
-    ut.show_gaze(pp=data, events=events, **common_args)
-    #for e in events:
-    #    print(e)
+    ut.show_gaze(pp=data, events=events, sampling_rate=common_args['sampling_rate'])
     import pylab as pl
+    pl.show()
     events = ut.events2df(events)
     saccades = events[events['label'] == 'SACC']
     isaccades = events[events['label'] == 'ISAC']
@@ -71,9 +70,9 @@ def test_real_data():
     clf = d.EyegazeClassifier(
         min_intersaccade_duration=0.04,
         # high threshold, static stimuli, should not have pursuit
-        max_fixation_amp=4.0,
+        max_fixation_amp=.5,
         **common_args)
-    p = clf.preproc(data, dilate_nan=0.03)
+    p = clf.preproc(data.copy(), dilate_nan=0.03)
 
     events = clf(p)
 
@@ -83,12 +82,19 @@ def test_real_data():
         print('{:.4f} -> {:.4f}: {} ({})'.format(
             e['start_time'], e['end_time'], e['label'], e['id']))
 
-    ut.show_gaze(pp=p, events=events, **common_args)
     import pylab as pl
-    events = ut.events2df(events)
-    saccades = events[events['label'] == 'SACC']
-    isaccades = events[events['label'] == 'ISAC']
-    print('#saccades', len(saccades), len(isaccades))
-    pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
-    pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
-    pl.show()
+    pl.figure(figsize=(2 * (len(data) / 1000.0), 3))
+    ut.show_gaze(data=data, pp=p, events=events, sampling_rate=common_args['sampling_rate'])
+    pl.ylim((0, 1024))
+    pl.xlim((0, len(data) / common_args['sampling_rate']))
+    pl.ylabel('Coordinates (pixel) / Velocities (deg/s)')
+    pl.xlabel('Time (seconds)')
+    pl.savefig('dummy.png', bbox_inches='tight', format='png')
+    #pl.show()
+    #events = ut.events2df(events)
+    #saccades = events[events['label'] == 'SACC']
+    #isaccades = events[events['label'] == 'ISAC']
+    #print('#saccades', len(saccades), len(isaccades))
+    #pl.plot(saccades['amp'], saccades['peak_vel'], '.', alpha=.3)
+    #pl.plot(isaccades['amp'], isaccades['peak_vel'], '.', alpha=.3)
+    #pl.show()

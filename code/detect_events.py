@@ -4,10 +4,8 @@ import numpy as np
 from statsmodels.robust.scale import mad
 from scipy import signal
 from scipy import ndimage
-from scipy.signal import savgol_filter # Savitzky–Golay filter, for smoothing data
+from scipy.signal import savgol_filter
 from scipy.ndimage import median_filter
-import sys
-import gzip
 from math import (
     degrees,
     atan2,
@@ -792,6 +790,52 @@ class EyegazeClassifier(object):
         names.extend(['vel', 'accel', 'x', 'y'])
         return np.core.records.fromarrays(arrs, names=names)
 
+    def show_gaze(self, data=None, pp=None, events=None, show_vels=True):
+        colors = {
+            'FIXA': 'xkcd:beige',
+            'PURS': 'xkcd:burnt sienna',
+            'SACC': 'xkcd:spring green',
+            'ISAC': 'xkcd:pea green',
+            'HPSO': 'xkcd:azure',
+            'IHPS': 'xkcd:azure',
+            'LPSO': 'xkcd:faded blue',
+            'ILPS': 'xkcd:faded blue',
+        }
+
+        import pylab as pl
+        if events is not None:
+            for ev in events:
+                pl.axvspan(
+                    ev['start_time'],
+                    ev['end_time'],
+                    color=colors[ev['label']],
+                    alpha=0.8)
+        ntimepoints = len(pp) if pp is not None else len(data)
+        timepoints = np.linspace(0, ntimepoints / self.sr, ntimepoints)
+        if data is not None:
+            pl.plot(
+                timepoints,
+                data['x'],
+                color='xkcd:pig pink', lw=1)
+            pl.plot(
+                timepoints,
+                data['y'],
+                color='xkcd:pig pink', lw=1)
+        if pp is not None:
+            if show_vels:
+                pl.plot(
+                    timepoints,
+                    pp['vel'],
+                    color='xkcd:gunmetal', lw=1)
+            pl.plot(
+                timepoints,
+                pp['x'],
+                color='black', lw=1)
+            pl.plot(
+                timepoints,
+                pp['y'],
+                color='black', lw=1)
+
 
 if __name__ == '__main__':
     import argparse
@@ -877,31 +921,61 @@ if __name__ == '__main__':
 
     events2bids_events_tsv(events, args.outfile)
 
+    import matplotlib
+    matplotlib.use('agg')
     import pylab as pl
-    import pandas as pd
-    events = pd.DataFrame(events)
 
-    saccades = events[events['label'] == 'SACC']
-    isaccades = events[events['label'] == 'ISAC']
-    hvpso = events[(events['label'] == 'HPSO') | (events['label'] == 'IHPS')]
-    lvpso = events[(events['label'] == 'LPSO') | (events['label'] == 'ILPS')]
-
-    pl.figure(figsize=(6,4))
-    for ev, sym, color, label in (
-            (saccades, '.', 'black', 'saccades'),
-            (isaccades, '.', 'xkcd:green teal', '"minor" saccades'),
-            (hvpso, '+', 'xkcd:burnt sienna', 'fast PSOs'),
-            (lvpso, '+', 'xkcd:azure', 'slow PSOs'))[::-1]:
-        pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
-                  alpha=.2, lw=1, label=label)
-
-    pl.ylim((10.0, args.max_vel))
-    pl.xlim((0.01, 40.0))
-    pl.legend(loc=4)
-    pl.ylabel('peak velocities (deg/s)')
-    pl.xlabel('amplitude (deg)')
+    # one inch per second, or as big as PNG software/browsers can handle
+    duration = float(len(data)) / args.sampling_rate
+    pl.figure(figsize=(min(duration, 400), 3), dpi=100)
+    clf.show_gaze(pp=pp, events=events, show_vels=False)
+    pl.xlim((0, duration))
+    pl.xticks(np.arange(0, duration, step=1))
+    pl.title('Detected eye movement events, parameters: {}'.format(
+        ', '.join([
+            '{}={}'.format(k, getattr(args, k))
+            for k in sorted((
+                'px2deg', 'sampling_rate', 'velthresh_startvelocity',
+                'min_intersaccade_duration', 'min_saccade_duration',
+                'max_initial_saccade_freq', 'saccade_context_window_length',
+                'max_pso_duration', 'min_fixation_duration',
+                'max_fixation_amp', 'min_blink_duration', 'dilate_nan',
+                'median_filter_length', 'savgol_length', 'savgol_polyord',
+                'max_vel'))
+        ])
+    ))
+    pl.ylabel('coordinates (pixel)')
+    pl.xlabel('time (seconds)')
     pl.savefig(
-        '{}_mainseq.png'.format(
+        '{}.png'.format(
             args.outfile[:-4] if args.outfile.endswith('.tsv')
             else args.outfile),
-        bbox_inches='tight', format='png')
+        bbox_inches='tight', format='png', dpi=100)
+
+    #import pandas as pd
+    #events = pd.DataFrame(events)
+
+    #saccades = events[events['label'] == 'SACC']
+    #isaccades = events[events['label'] == 'ISAC']
+    #hvpso = events[(events['label'] == 'HPSO') | (events['label'] == 'IHPS')]
+    #lvpso = events[(events['label'] == 'LPSO') | (events['label'] == 'ILPS')]
+
+    #pl.figure(figsize=(6,4))
+    #for ev, sym, color, label in (
+    #        (saccades, '.', 'black', 'saccades'),
+    #        (isaccades, '.', 'xkcd:green teal', '"minor" saccades'),
+    #        (hvpso, '+', 'xkcd:burnt sienna', 'fast PSOs'),
+    #        (lvpso, '+', 'xkcd:azure', 'slow PSOs'))[::-1]:
+    #    pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
+    #              alpha=.2, lw=1, label=label)
+
+    #pl.ylim((10.0, args.max_vel))
+    #pl.xlim((0.01, 40.0))
+    #pl.legend(loc=4)
+    #pl.ylabel('peak velocities (deg/s)')
+    #pl.xlabel('amplitude (deg)')
+    #pl.savefig(
+    #    '{}_mainseq.svg'.format(
+    #        args.outfile[:-4] if args.outfile.endswith('.tsv')
+    #        else args.outfile),
+    #    bbox_inches='tight', format='svg')

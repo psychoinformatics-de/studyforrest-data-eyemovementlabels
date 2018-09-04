@@ -75,16 +75,17 @@ def samp2file(data, fname):
         delimiter='\t')
 
 
-def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0):
+def show_gaze(data=None, pp=None, events=None,
+              sampling_rate=1000.0, show_vels=True):
     colors = {
-        'FIXA': 'gray',
-        'PURS': 'red',
-        'SACC': 'green',
-        'ISAC': 'pink',
-        'HPSO': 'yellow',
-        'IHPS': 'orange',
-        'LPSO': 'cyan',
-        'ILPS': 'blue',
+        'FIXA': 'xkcd:beige',
+        'PURS': 'xkcd:burnt sienna',
+        'SACC': 'xkcd:spring green',
+        'ISAC': 'xkcd:pea green',
+        'HPSO': 'xkcd:azure',
+        'IHPS': 'xkcd:azure',
+        'LPSO': 'xkcd:faded blue',
+        'ILPS': 'xkcd:faded blue',
     }
 
     import pylab as pl
@@ -92,26 +93,25 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
         pl.plot(
             np.linspace(0, len(data) / sampling_rate, len(data)),
             data['x'],
-            color='blue')
+            color='xkcd:pig pink', lw=1)
         pl.plot(
             np.linspace(0, len(data) / sampling_rate, len(data)),
             data['y'],
-            color='blue')
+            color='xkcd:pig pink', lw=1)
     if pp is not None:
-        pl.plot(
-            np.linspace(0, len(pp) / sampling_rate, len(pp)),
-            pp['vel'],
-            #(pp['accel'] / np.abs(pp['accel'][~np.isnan(pp['accel'])]).max()) * 1000,
-            #(pp['accel'] / np.abs(pp['accel']).max()) * 1000,
-            color='gray')
+        if show_vels:
+            pl.plot(
+                np.linspace(0, len(pp) / sampling_rate, len(pp)),
+                pp['vel'],
+                color='xkcd:gunmetal', lw=1)
         pl.plot(
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['x'],
-            color='orange')
+            color='black', lw=1)
         pl.plot(
             np.linspace(0, len(pp) / sampling_rate, len(pp)),
             pp['y'],
-            color='orange')
+            color='black', lw=1)
         #pl.plot(
         #    np.linspace(0, len(pp) / sampling_rate, len(pp)),
         #    pp['med_vel'],
@@ -123,8 +123,7 @@ def show_gaze(data=None, pp=None, events=None, px2deg=None, sampling_rate=1000.0
                 ev['end_time'],
                 color=colors[ev['label']],
                 alpha=0.3)
-            pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['id']), color='red')
-    pl.show()
+            #pl.text(ev['start_time'], 0, '{:.1f}'.format(ev['id']), color='red')
 
 
 def events2df(events):

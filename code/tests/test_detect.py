@@ -113,8 +113,8 @@ def test_real_data(infile):
         assert t in labels
     return
 
-    ut.show_gaze(pp=p[:50000], events=events, px2deg=0.0185581232561)
-    #ut.show_gaze(pp=p, events=events, px2deg=0.0185581232561)
+    ut.show_gaze(pp=p[:50000], events=events)
+    #ut.show_gaze(pp=p, events=events)
     import pylab as pl
     saccades = evdf[evdf['label'] == 'SACC']
     isaccades = evdf[evdf['label'] == 'ISAC']

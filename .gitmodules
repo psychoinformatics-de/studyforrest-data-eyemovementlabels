@@ -1,3 +1,6 @@
 [submodule "inputs/raw_eyegaze"]
 	path = inputs/raw_eyegaze
 	url = https://github.com/psychoinformatics-de/studyforrest-data-phase2.git
+[submodule "code/remodnav"]
+	path = code/remodnav
+	url = https://github.com/psychoinformatics-de/remodnav.git

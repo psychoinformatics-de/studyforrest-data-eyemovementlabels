@@ -13,6 +13,9 @@ from numpy.polynomial import Polynomial
 from scipy import stats
 import matplotlib.ticker as ticker
 
+import pdb
+#pdb.set_trace() to set breakpoint
+
 
 fulllist = glob.glob("*sub*")
 fulllist.sort()
@@ -53,6 +56,7 @@ for i in listfor5_1:
 # Extracting lines only that contrain type "SACCADE"
 
 # Make a boolean series if SACCADE or not
+pdb.set_trace() #DELETE
 saccades = (allsubsrun.label == "SACC") | (allsubsrun.label == "ISAC")
 
 # Seeking out only saccades from the dataset
@@ -71,7 +75,7 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-14/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+subject24_4 = dictofsamples['c24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
 a2saccades = (subject24_4.label == "SACC") | (subject24_4.label == "ISAC")
 
 a2saccadesonly = subject24_4[a2saccades] 

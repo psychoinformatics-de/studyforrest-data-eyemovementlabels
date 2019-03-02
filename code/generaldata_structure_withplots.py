@@ -57,7 +57,6 @@ for i in listfor5_1:
 # Extracting lines only that contrain type "SACCADE"
 
 # Make a boolean series if SACCADE or not
-pdb.set_trace() #DELETE
 # | is an boolean or
 saccades = (allsubsrun.label == "SACC") | (allsubsrun.label == "ISAC")
 
@@ -149,11 +148,6 @@ pl.xlim((0.01, 40.0))
 pl.legend(loc=4)
 pl.ylabel('peak velocities (deg/s)')
 pl.xlabel('amplitude (deg)')
-
-a2saccadesonly = subject24_4[a2saccades] 
-
-
-
 
 
 ## Sorting out Data to yield the data for tables TODO: save as separate script

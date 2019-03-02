@@ -22,9 +22,14 @@ fulllist = glob.glob("*sub*")
 fulllist.sort()
 
 #TODO: Assign inputs to determin this, or simply input at start of script input('Show results for? 1-both 2-Beh 3-MRI') followed by downstream changes
-list = fulllist     #for both 
-#list = fulllist[15:] #for beh
-#list = fulllist[0:15] # for MRI
+
+dataSet = input('Show results for (type number): (1)-Both Datasets (MRI and in-Lab) (2)-In-Lab(clean data) (3)-MRI (Noisy data) = ')
+if dataSet == '1':
+    list = fulllist     #for both
+if dataSet == '2':
+    list = fulllist[15:] #for beh
+if dataSet == '3':
+    list = fulllist[0:15] # for MRI
 
 dictofsamples = {}
 
@@ -125,10 +130,11 @@ productgraph.set(ylabel='Product of peak velocity and duration', xlabel = 'Ampli
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
 plt.draw()
 
-### Figure A6 - Mainsequence with Saccades and PSOs
+### Figure A6 - Mainsequence with Saccades and PSOs TODO: Make into function for easy viewing
 
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+#subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+subject24_4 = allsubsrun
 a2saccades = subject24_4[(subject24_4.label == "SACC")] 
 a2isaccades = subject24_4[(subject24_4.label == "ISAC")]
 a2hvpso = subject24_4[(subject24_4.label == "HPSO") |(subject24_4.label == "IHPS")]
@@ -141,7 +147,7 @@ for ev, sym, color, label in (
         (a2hvpso, '+', 'xkcd:pinkish', 'High velocity PSOs'),
         (a2lvpso, '+', 'xkcd:wine', 'PSOs'))[::-1]:
     pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
-                        alpha=1, lw=1, label=label)
+                        alpha=0.01, lw=1, label=label)
 
 pl.ylim((10.0, 1000)) #previously args.max_vel, put this back in
 pl.xlim((0.01, 40.0))

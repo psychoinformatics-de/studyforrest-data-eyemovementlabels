@@ -199,7 +199,7 @@ def findamppeak (segment):
 	
 	# in the case erroneous data is found (amp = 0)
 	if min(amplitude) == 0:
-		print "Number of 0 valued amplitudes found :", len(segmentlist['segment'+str(segment)].amp[segmentlist['segment'+str(segment)].amp==0])
+		print ("Number of 0 valued amplitudes found :", len(segmentlist['segment'+str(segment)].amp[segmentlist['segment'+str(segment)].amp==0]))
 		cleanset = segmentlist['segment'+str(segment)]
 		cleanset = cleanset[cleanset.amp != 0]
 		peakvel =  cleanset.peak_vel
@@ -272,7 +272,7 @@ allsaccadecounts.index = range (1,9)
 
 finaltable5_1 = pd.concat([data, allsaccadecounts], axis=1)
 print ("Table 5.1")
-print finaltable5_1
+print (finaltable5_1)
 
 
 ## Table 5.2 
@@ -335,7 +335,7 @@ Table5_2 = Table5_2 [['#','r sqrd','Slope']]
 Table5_2.index= range(1,9)
 print ("  ")
 print ("Table 5.2")
-print Table5_2
+print (Table5_2)
 
 ## Table 5.3 - Gliccade and Fixation data
 
@@ -357,12 +357,12 @@ Table5_3F.index= range(1,9)
 
 print ("  ")
 print ("Table 5.3 - Gliccades")
-print Table5_3G
+print (Table5_3G)
 
 print ("  ")
 
 print ("Table 5.3 - Fixations")
-print Table5_3F
+print (Table5_3F)
 
 
 

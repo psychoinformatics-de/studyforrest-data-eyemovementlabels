@@ -12,6 +12,10 @@ import numpy as np
 from numpy.polynomial import Polynomial
 from scipy import stats
 import matplotlib.ticker as ticker
+import pylab as pl
+
+import pdb
+#pdb.set_trace() to set breakpoint
 
 
 fulllist = glob.glob("*sub*")
@@ -53,6 +57,8 @@ for i in listfor5_1:
 # Extracting lines only that contrain type "SACCADE"
 
 # Make a boolean series if SACCADE or not
+pdb.set_trace() #DELETE
+# | is an boolean or
 saccades = (allsubsrun.label == "SACC") | (allsubsrun.label == "ISAC")
 
 # Seeking out only saccades from the dataset
@@ -71,7 +77,7 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-14/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
 a2saccades = (subject24_4.label == "SACC") | (subject24_4.label == "ISAC")
 
 a2saccadesonly = subject24_4[a2saccades] 
@@ -119,6 +125,36 @@ productgraph.set(ylabel='Product of peak velocity and duration', xlabel = 'Ampli
 #plt.ylim(0, 30000)
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
 plt.draw()
+
+### Figure A6 - Mainsequence with Saccades and PSOs
+
+# Sort out data as above, but now for only subject 24, run 4
+subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+a2saccades = subject24_4[(subject24_4.label == "SACC")] 
+a2isaccades = subject24_4[(subject24_4.label == "ISAC")]
+a2hvpso = subject24_4[(subject24_4.label == "HPSO") |(subject24_4.label == "IHPS")]
+a2lvpso = subject24_4[(subject24_4.label == "LPSO") | (subject24_4.label == "ILPS")]
+
+pl.figure(figsize=(6,4))
+for ev, sym, color, label in (
+        (a2saccades, '.', 'xkcd:green grey', 'Segment defining saccade'),
+        (a2isaccades, '.', 'xkcd:dark olive', 'Saccades'),
+        (a2hvpso, '+', 'xkcd:pinkish', 'High velocity PSOs'),
+        (a2lvpso, '+', 'xkcd:wine', 'PSOs'))[::-1]:
+    pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
+                        alpha=1, lw=1, label=label)
+
+pl.ylim((10.0, 1000)) #previously args.max_vel, put this back in
+pl.xlim((0.01, 40.0))
+pl.legend(loc=4)
+pl.ylabel('peak velocities (deg/s)')
+pl.xlabel('amplitude (deg)')
+
+a2saccadesonly = subject24_4[a2saccades] 
+
+
+
+
 
 ## Sorting out Data to yield the data for tables TODO: save as separate script
 
@@ -199,7 +235,7 @@ def findamppeak (segment):
 	
 	# in the case erroneous data is found (amp = 0)
 	if min(amplitude) == 0:
-		print "Number of 0 valued amplitudes found :", len(segmentlist['segment'+str(segment)].amp[segmentlist['segment'+str(segment)].amp==0])
+		print ("Number of 0 valued amplitudes found :", len(segmentlist['segment'+str(segment)].amp[segmentlist['segment'+str(segment)].amp==0]))
 		cleanset = segmentlist['segment'+str(segment)]
 		cleanset = cleanset[cleanset.amp != 0]
 		peakvel =  cleanset.peak_vel
@@ -272,7 +308,7 @@ allsaccadecounts.index = range (1,9)
 
 finaltable5_1 = pd.concat([data, allsaccadecounts], axis=1)
 print ("Table 5.1")
-print finaltable5_1
+print (finaltable5_1)
 
 
 ## Table 5.2 
@@ -335,7 +371,7 @@ Table5_2 = Table5_2 [['#','r sqrd','Slope']]
 Table5_2.index= range(1,9)
 print ("  ")
 print ("Table 5.2")
-print Table5_2
+print (Table5_2)
 
 ## Table 5.3 - Gliccade and Fixation data
 
@@ -357,12 +393,12 @@ Table5_3F.index= range(1,9)
 
 print ("  ")
 print ("Table 5.3 - Gliccades")
-print Table5_3G
+print (Table5_3G)
 
 print ("  ")
 
 print ("Table 5.3 - Fixations")
-print Table5_3F
+print (Table5_3F)
 
 
 

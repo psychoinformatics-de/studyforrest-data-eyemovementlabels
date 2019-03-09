@@ -81,7 +81,12 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+testSubject = 'subject 24, run 4'
+if dataSet == '1' or dataSet =='2':
+    subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+else:
+    subject24_4 = dictofsamples['sub-09/sub-09_task-movie_run-4_events.tsv']
+    testSubject = 'subject 09, run 4'
 a2saccades = (subject24_4.label == "SACC") | (subject24_4.label == "ISAC")
 
 a2saccadesonly = subject24_4[a2saccades] 
@@ -89,7 +94,7 @@ a2saccadesonly = subject24_4[a2saccades]
 # Plotting 
 velampgraph = sns.regplot(a2saccadesonly.amp,a2saccadesonly.peak_vel,fit_reg = False,scatter_kws={"s": 15})
 #velampgraph = sns.scatterplot(x= "amp", y="peak_vel", data = a2saccadesonly) No idea why this doesn't work
-plt.title('Relationship between peak velocity and amplitude (subject 24)')
+plt.title('Relationship between peak velocity and amplitude ({})'.format(testSubject))
 velampgraph.set(xlabel='Amplitude', ylabel= 'Peak Velocity',yscale="log",xscale="log")
 
 
@@ -133,12 +138,17 @@ plt.draw()
 ### Figure A6 - Mainsequence with Saccades and PSOs TODO: Make into function for easy viewing
 
 # Sort out data as above, but now for only subject 24, run 4
-#subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
-subject24_4 = allsubsrun
-a2saccades = subject24_4[(subject24_4.label == "SACC")] 
-a2isaccades = subject24_4[(subject24_4.label == "ISAC")]
-a2hvpso = subject24_4[(subject24_4.label == "HPSO") |(subject24_4.label == "IHPS")]
-a2lvpso = subject24_4[(subject24_4.label == "LPSO") | (subject24_4.label == "ILPS")]
+if dataSet == '1' or dataSet =='2':
+    singleTestSubject = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+else:
+    singleTestSubject = dictofsamples['sub-09/sub-09_task-movie_run-4_events.tsv']
+#Take a look at all events
+#subject24_4 = allsubsrun
+
+a2saccades = singleTestSubject[(singleTestSubject.label == "SACC")] 
+a2isaccades = singleTestSubject[(singleTestSubject.label == "ISAC")]
+a2hvpso = singleTestSubject[(singleTestSubject.label == "HPSO") |(singleTestSubject.label == "IHPS")]
+a2lvpso = singleTestSubject[(singleTestSubject.label == "LPSO") | (singleTestSubject.label == "ILPS")]
 
 pl.figure(figsize=(6,4))
 for ev, sym, color, label in (
@@ -147,7 +157,7 @@ for ev, sym, color, label in (
         (a2hvpso, '+', 'xkcd:pinkish', 'High velocity PSOs'),
         (a2lvpso, '+', 'xkcd:wine', 'PSOs'))[::-1]:
     pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
-                        alpha=0.01, lw=1, label=label)
+                        alpha=0.75, lw=1, label=label)
 
 pl.ylim((10.0, 1000)) #previously args.max_vel, put this back in
 pl.xlim((0.01, 40.0))

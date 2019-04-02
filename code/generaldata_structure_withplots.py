@@ -12,6 +12,7 @@ import numpy as np
 from numpy.polynomial import Polynomial
 from scipy import stats
 import matplotlib.ticker as ticker
+import pylab as pl
 
 import pdb
 #pdb.set_trace() to set breakpoint
@@ -21,9 +22,14 @@ fulllist = glob.glob("*sub*")
 fulllist.sort()
 
 #TODO: Assign inputs to determin this, or simply input at start of script input('Show results for? 1-both 2-Beh 3-MRI') followed by downstream changes
-list = fulllist     #for both 
-#list = fulllist[15:] #for beh
-#list = fulllist[0:15] # for MRI
+
+dataSet = input('Show results for (type number): (1)-Both Datasets (MRI and in-Lab) (2)-In-Lab(clean data) (3)-MRI (Noisy data) = ')
+if dataSet == '1':
+    list = fulllist     #for both
+if dataSet == '2':
+    list = fulllist[15:] #for beh
+if dataSet == '3':
+    list = fulllist[0:15] # for MRI
 
 dictofsamples = {}
 
@@ -56,7 +62,7 @@ for i in listfor5_1:
 # Extracting lines only that contrain type "SACCADE"
 
 # Make a boolean series if SACCADE or not
-pdb.set_trace() #DELETE
+# | is an boolean or
 saccades = (allsubsrun.label == "SACC") | (allsubsrun.label == "ISAC")
 
 # Seeking out only saccades from the dataset
@@ -75,7 +81,12 @@ plt.draw()
 ### Figure A2 All peak velocities plotted against the amplitudes
 plt.figure()
 # Sort out data as above, but now for only subject 24, run 4
-subject24_4 = dictofsamples['c24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+testSubject = 'subject 24, run 4'
+if dataSet == '1' or dataSet =='2':
+    subject24_4 = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+else:
+    subject24_4 = dictofsamples['sub-09/sub-09_task-movie_run-4_events.tsv']
+    testSubject = 'subject 09, run 4'
 a2saccades = (subject24_4.label == "SACC") | (subject24_4.label == "ISAC")
 
 a2saccadesonly = subject24_4[a2saccades] 
@@ -83,7 +94,7 @@ a2saccadesonly = subject24_4[a2saccades]
 # Plotting 
 velampgraph = sns.regplot(a2saccadesonly.amp,a2saccadesonly.peak_vel,fit_reg = False,scatter_kws={"s": 15})
 #velampgraph = sns.scatterplot(x= "amp", y="peak_vel", data = a2saccadesonly) No idea why this doesn't work
-plt.title('Relationship between peak velocity and amplitude (subject 24)')
+plt.title('Relationship between peak velocity and amplitude ({})'.format(testSubject))
 velampgraph.set(xlabel='Amplitude', ylabel= 'Peak Velocity',yscale="log",xscale="log")
 
 
@@ -123,6 +134,37 @@ productgraph.set(ylabel='Product of peak velocity and duration', xlabel = 'Ampli
 #plt.ylim(0, 30000)
 plt.title('Relationship between amplitude and the product of peak velocity and duration ')
 plt.draw()
+
+### Figure A6 - Mainsequence with Saccades and PSOs TODO: Make into function for easy viewing
+
+# Sort out data as above, but now for only subject 24, run 4
+if dataSet == '1' or dataSet =='2':
+    singleTestSubject = dictofsamples['sub-24/sub-24_task-movie_run-4_events.tsv'] # currently manually replacing with random subject (9) in MRI
+else:
+    singleTestSubject = dictofsamples['sub-09/sub-09_task-movie_run-4_events.tsv']
+#Take a look at all events
+#subject24_4 = allsubsrun
+
+a2saccades = singleTestSubject[(singleTestSubject.label == "SACC")] 
+a2isaccades = singleTestSubject[(singleTestSubject.label == "ISAC")]
+a2hvpso = singleTestSubject[(singleTestSubject.label == "HPSO") |(singleTestSubject.label == "IHPS")]
+a2lvpso = singleTestSubject[(singleTestSubject.label == "LPSO") | (singleTestSubject.label == "ILPS")]
+
+pl.figure(figsize=(6,4))
+for ev, sym, color, label in (
+        (a2saccades, '.', 'xkcd:green grey', 'Segment defining saccade'),
+        (a2isaccades, '.', 'xkcd:dark olive', 'Saccades'),
+        (a2hvpso, '+', 'xkcd:pinkish', 'High velocity PSOs'),
+        (a2lvpso, '+', 'xkcd:wine', 'PSOs'))[::-1]:
+    pl.loglog(ev['amp'], ev['peak_vel'], sym, color=color,
+                        alpha=0.75, lw=1, label=label)
+
+pl.ylim((10.0, 1000)) #previously args.max_vel, put this back in
+pl.xlim((0.01, 40.0))
+pl.legend(loc=4)
+pl.ylabel('peak velocities (deg/s)')
+pl.xlabel('amplitude (deg)')
+
 
 ## Sorting out Data to yield the data for tables TODO: save as separate script
 

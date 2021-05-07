@@ -1,0 +1,67 @@
+# Metadata for DOI registration according to DataCite Metadata Schema 4.1.
+# For detailed schema description see https://doi.org/10.5438/0014
+
+authors:
+  - firstname: Asim H.
+    lastname: Dar
+
+  - firstname: Adina
+    lastname: Wagner
+    id: "ORCID:0000-0003-2917-3450"
+
+  - firstname: Michael
+    lastname: Hanke
+    id: "ORCID:0000-0001-6398-6370"
+
+  - firstname: Alex
+    lastname: Waite
+
+  - firstname: Laura
+    lastname: Waite
+    id: "ORCID:0000-0003-2213-7465"
+
+  - firstname: Christian
+    lastname: Mönch
+    id: "ORCID:0000-0002-3092-0612"
+
+
+title: Eye movement events for the Forrest Gump movie
+
+
+description: |
+  "Two groups of participants (each n=15) watched this movie. One in a lab setup,
+   another one in a MRI scanner. The original data are described in Hanke et al.
+   (2016, http://www.nature.com/articles/sdata201692). This dataset contains
+   eye movements results of fixations, saccades, post-saccadic oscillations,
+   and pursuit events. Details of the detection procedure are available in:
+
+   Asim H. Dar, Adina S. Wagner & Michael Hanke (2020). REMoDNaV: Robust Eye
+   Movement Detection for Natural Viewing. bioRxiv, 619254.
+   doi: https://doi.org/10.1101/619254
+
+   For more information about the project visit: http://studyforrest.org"
+
+
+keywords:
+  - Neuroscience
+  - Studyforrest
+
+
+license:
+  name: "Open Data Commons Public Domain Dedication and License (PDDL)"
+  url: "https://opendatacommons.org/licenses/pddl/"
+
+
+references:
+
+  - id: "DOI:10.1101/619254"
+    reftype: "IsSupplementTo"
+    citation: "Dar, Asim H., Wagner, Adina S., Hanke, Michael. (2020). REMoDNaV: Robust Eye-Movement Classification for Dynamic Stimulation. bioRxiv, 619254"
+
+
+# Resource type. Default is Dataset, other possible values are Software, Image, Text.
+resourcetype: Dataset
+
+
+# Do not edit or remove the following line
+templateversion: 1.2
